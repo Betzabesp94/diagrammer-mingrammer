@@ -1,0 +1,25 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Imágenes generadas
+/output/*
+!/output/.gitkeep
+
+# Imágenes sueltas en la raíz (si alguien corre un script sin la ruta de salida)
+/*.png
+/*.svg
+/*.pdf
+
+# Archivos intermedios de Graphviz
+*.gv
+*.dot
+
+# macOS
+.DS_Store
