@@ -1,0 +1,53 @@
+{
+  "skill_name": "diagrams-architect",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Necesito un diagrama para diagrams_src/ de una app web chica en AWS: un dominio con Route53, un load balancer, dos instancias EC2 dentro de una VPC, y una base de datos RDS Postgres detrás.",
+      "expected_output": "diagrams_src/<slug>.py con 5 nodos (Route53, ELB/ALB, 2x EC2, RDS), 1 cluster VPC, 5 edges (dns->lb, lb->web1, lb->web2, web1->db, web2->db), validate_diagram.py en PASS, reporte con mapeos 'exact'.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Armá un diagrama de una VPC con dos subnets: una pública con un NAT gateway y un bastion EC2, y una privada con 3 instancias EC2 detrás de un ALB que está en la subnet pública.",
+      "expected_output": "Clusters anidados (VPC > subnet pública / subnet privada), nodos en el cluster correcto, sin conexiones directas de internet a la subnet privada.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Quiero ver la arquitectura: CloudFront adelante, pasando por un WAF, después un Application Load Balancer, que manda tráfico a un cluster de ECS, que lee y escribe en RDS.",
+      "expected_output": "5 nodos, 4 edges en cadena (cf->waf->alb->ecs->rds), sin warnings de seguridad (WAF está delante del ALB), fidelity PASS con --ir.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Necesito un diagrama serverless: API Gateway recibe requests y las manda a una función Lambda, que lee/escribe en una tabla DynamoDB.",
+      "expected_output": "3 nodos (APIGateway, Lambda, Dynamodb) resueltos como 'exact', 2 edges, sin Cluster (no se mencionó ningún boundary).",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Dibujame un diagrama que use el nuevo servicio de IA generativa de AWS para agentes (todavía no sé si esta librería lo tiene con ícono propio), conectado a una Lambda que lo invoca.",
+      "expected_output": "La skill corre introspect_diagrams.py search antes de asumir nada; si no encuentra clase 1:1, degrada a generic.* o Custom y lo reporta explícitamente como tal, nunca inventa un import.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Esta es una arquitectura de producción con alta disponibilidad: ALB -> 2 EC2 en distintas AZ -> RDS Postgres. Necesito el diagrama.",
+      "expected_output": "Genera el diagrama tal como se pidió (sin agregar componentes no pedidos) y el reporte incluye un WARNING de disponibilidad si el RDS no se marca multi-AZ, separado como recomendación, sin alterar la topología generada.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Tengo esta arquitectura en Mermaid, pasámela a diagrams_src por favor:\n```mermaid\nflowchart LR\n  User --> APIGW[API Gateway]\n  APIGW --> Lambda\n  Lambda --> DDB[(DynamoDB)]\n```",
+      "expected_output": "Toma el Mermaid como especificación ya resuelta (no lo reinterpreta como prosa libre), mapea los 3 nodos relevantes a clases reales de diagrams y genera el .py con las mismas 2 conexiones (sin contar el nodo 'User' si no tiene ícono de proveedor aplicable, o mapeándolo a generic si corresponde).",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Un balanceador recibe tráfico y lo manda a un grupo de servidores que escriben en una base de datos. No importa mucho el proveedor.",
+      "expected_output": "Ante la ambigüedad de proveedor, o bien usa diagrams.generic.* de forma consistente y lo reporta, o pregunta solo si es significativo — no debe mezclar proveedores sin avisar ni inventar un proveedor no mencionado.",
+      "files": []
+    }
+  ]
+}
