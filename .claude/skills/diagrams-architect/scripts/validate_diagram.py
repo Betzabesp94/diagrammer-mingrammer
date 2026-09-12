@@ -29,11 +29,19 @@ Salida: un único JSON por stdout con status por dimensión (PASS/FAIL/WARNING),
 detalles, y un resumen de nodos/edges/clusters. Exit code 0 si no hay ERROR, 1 si
 hay al menos un ERROR (la skill debe tratar eso como bloqueante, ver SKILL.md).
 
-Limitación conocida y documentada: el conteo de edges es un heurístico estático
-sobre el AST (sigue cadenas de `>>`/`<<`/`-`, resuelve fan-out/fan-in de listas
-literales y de variables asignadas a una lista o a un nodo simple, e ignora los
-`Edge(...)` intermedios como nodos). No ejecuta el script, así que un patrón muy
-dinámico (nodos creados dentro de un loop con lógica compleja) puede subestimarse;
+Soporta dos patrones de generación de nodos/edges, y los cuenta juntos (podés
+mezclarlos en un mismo archivo):
+  - Clásico:       `EC2("web")`, `a >> Edge(label=...) >> b`.
+  - Design system: `service_card(...)` / `internal_card(...)` para nodos,
+    `flow(...)` para edges (ver references/design_system.md). `sticky_note(...)`
+    nunca cuenta como nodo de arquitectura -- es una anotación.
+
+Limitación conocida y documentada: el conteo de edges del patrón clásico es un
+heurístico estático sobre el AST (sigue cadenas de `>>`/`<<`/`-`, resuelve
+fan-out/fan-in de listas literales y de variables asignadas a una lista o a un
+nodo simple, e ignora los `Edge(...)` intermedios como nodos). No ejecuta el
+script, así que un patrón muy dinámico (nodos creados dentro de un loop con
+lógica compleja) puede subestimarse;
 en ese caso el script lo reporta como advertencia, no como fallo silencioso.
 """
 
@@ -53,6 +61,15 @@ introspect = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(introspect)
 
 CORE_NAMES = {"Diagram", "Cluster", "Group", "Edge", "Node"}
+
+# Patron "design system" (ver references/design_system.md): en vez de
+# `ClassName("label")` + `a >> b`, un diagrama con estetica de pizarra/Miro usa
+# estos nombres de funcion fijos para crear nodos y aristas. Ambos patrones son
+# validos (uno o el otro, o mezclados) y este script cuenta nodos/edges de los
+# dos a la vez para que la fidelidad se valide igual sin importar cual se usó.
+NODE_FACTORY_NAMES = {"service_card", "internal_card"}
+EDGE_FACTORY_NAME = "flow"
+ANNOTATION_FACTORY_NAMES = {"sticky_note"}
 
 
 def check_syntax(path: Path):
@@ -135,10 +152,13 @@ def find_diagram_with(tree, core_aliases):
 
 
 def check_diagram_context(tree, name_to_info, diagram_with, parents):
-    """Todo Call a una clase diagrams (Node) debe estar dentro del with Diagram(...)."""
+    """Todo Call a una clase diagrams (Node), o a una factory del design system
+    (service_card/internal_card/flow/sticky_note), debe estar dentro del
+    with Diagram(...) activo."""
+    tracked_names = set(name_to_info) | NODE_FACTORY_NAMES | {EDGE_FACTORY_NAME} | ANNOTATION_FACTORY_NAMES
     offenders = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in name_to_info:
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in tracked_names:
             inside = False
             cur = node
             while cur in parents:
@@ -257,14 +277,31 @@ def _fontname_values(tree, var_values):
     return found
 
 
-def check_typography(tree):
-    """Ningun fontname puede resolver a una fuente hand-drawn bloqueada. El
-    default esperado es Helvetica-Bold, con fallback a Arial y despues
-    Times-Roman -- nunca una fuente informal (ver
-    references/repo_conventions.md)."""
+def _html_face_values(source, var_values):
+    """Valores de FACE="..." dentro de labels HTML-like (design system de
+    cards/badges). Cubre tanto un literal (FACE="Comic Sans") como el patron
+    de este repo, un f-string que interpola una variable (FACE="{FONT_BOLD}")."""
+    found = []
+    for m in re.finditer(r'FACE=\\?["\']([^"\'>]*)["\']', source):
+        value = m.group(1)
+        var_match = re.fullmatch(r"\{(\w+)\}", value)
+        if var_match:
+            resolved = var_values.get(var_match.group(1))
+            if resolved is not None:
+                found.append(resolved)
+        else:
+            found.append(value)
+    return found
+
+
+def check_typography(tree, source):
+    """Ningun fontname (ni un FACE="..." dentro de un label HTML-like) puede
+    resolver a una fuente hand-drawn bloqueada. El default esperado es
+    Helvetica-Bold, con fallback a Arial y despues Times-Roman -- nunca una
+    fuente informal (ver references/repo_conventions.md)."""
     var_values = _string_var_assignments(tree)
     offenders = []
-    for value in _fontname_values(tree, var_values):
+    for value in _fontname_values(tree, var_values) + _html_face_values(source, var_values):
         low = value.lower()
         if any(blocked in low for blocked in BLOCKED_FONTS):
             offenders.append(value)
@@ -312,7 +349,9 @@ def build_name_counts(diagram_with, name_to_info):
     counts = {}
 
     def count_of_expr(expr):
-        if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Name) and expr.func.id in name_to_info:
+        if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Name) and (
+            expr.func.id in name_to_info or expr.func.id in NODE_FACTORY_NAMES
+        ):
             return 1
         if isinstance(expr, (ast.List, ast.Tuple)):
             return sum(count_of_expr(e) for e in expr.elts)
@@ -329,9 +368,24 @@ def build_name_counts(diagram_with, name_to_info):
 
 
 def count_nodes(diagram_with, name_to_info):
+    """Nodos de arquitectura: instancias directas de una clase de diagrams
+    (patron clasico) + llamadas a service_card()/internal_card() (patron
+    design system). sticky_note() no cuenta -- es una anotacion, no un nodo
+    de arquitectura (ver references/ir_schema.md)."""
     n = 0
     for node in ast.walk(diagram_with):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in name_to_info:
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and (
+            node.func.id in name_to_info or node.func.id in NODE_FACTORY_NAMES
+        ):
+            n += 1
+    return n
+
+
+def count_flow_calls(diagram_with):
+    """Edges creadas con flow() (patron design system)."""
+    n = 0
+    for node in ast.walk(diagram_with):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == EDGE_FACTORY_NAME:
             n += 1
     return n
 
@@ -413,7 +467,7 @@ def main():
     conv_result = check_conventions(source, diagram_call)
     report["conventions"] = conv_result
 
-    typography_result = check_typography(tree)
+    typography_result = check_typography(tree, source)
     report["typography"] = typography_result
 
     topology = {}
@@ -424,6 +478,7 @@ def main():
         topology["nodes_found"] = count_nodes(diagram_with, name_to_info)
         topology["clusters_found"] = count_clusters(tree, cluster_alias)
         edges_found, unresolved = count_edges(diagram_with, name_counts, edge_alias, parents)
+        edges_found += count_flow_calls(diagram_with)
         topology["edges_found"] = edges_found
         if unresolved:
             topology["edges_unresolved_hint"] = unresolved

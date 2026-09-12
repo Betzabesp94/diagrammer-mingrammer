@@ -48,6 +48,12 @@
       "prompt": "Un balanceador recibe tráfico y lo manda a un grupo de servidores que escriben en una base de datos. No importa mucho el proveedor.",
       "expected_output": "Ante la ambigüedad de proveedor, o bien usa diagrams.generic.* de forma consistente y lo reporta, o pregunta solo si es significativo — no debe mezclar proveedores sin avisar ni inventar un proveedor no mencionado.",
       "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Quiero el mismo tipo de diagrama de siempre (CloudFront -> ALB -> ECS Fargate -> RDS, con un Secrets Manager para credenciales) pero con estética de pizarra colaborativa tipo Miro: tarjetas con ícono y descripción, flechas numeradas con badges, colores pastel por zona.",
+      "expected_output": "Usa el patrón design system (service_card/internal_card/flow/sticky_note de references/design_system.md, no el patrón clásico), sin agregar ni quitar componentes respecto de lo pedido, con fontname siempre Helvetica-Bold/Helvetica (nunca una fuente hand-drawn) y validate_diagram.py en PASS (incluida la dimensión typography).",
+      "files": []
     }
   ]
 }

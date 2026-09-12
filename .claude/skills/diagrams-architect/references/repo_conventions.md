@@ -81,9 +81,11 @@ fuentes suele ser una fuente del sistema operativo local (no del paquete
 generó el diagrama y faltar en la de otra persona o en CI, y Graphviz no
 avisa cuando eso pasa — simplemente sustituye por un sans-serif genérico en
 silencio, así que el resultado deja de ser reproducible entre máquinas sin que
-nadie lo note. La estética "pizarra colaborativa" (colores pastel, clusters
-redondeados, sticky notes con `shape="note"`) se logra igual sin tocar la
-tipografía — ver más abajo.
+nadie lo note. Esto aplica igual dentro de un label HTML del design system
+(`FACE="..."`, ver `references/design_system.md`), no solo a `fontname=...`.
+La estética "pizarra colaborativa" (colores pastel, clusters redondeados,
+cards con ícono+descripción, sticky notes) se logra igual sin tocar la
+tipografía — ver `references/design_system.md` para el patrón completo.
 
 ## `direction`
 

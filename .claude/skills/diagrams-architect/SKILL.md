@@ -13,7 +13,8 @@ description: >-
   diagrama de arquitectura (AWS, GCP, Azure, Kubernetes, on-prem, multi-cloud,
   C4) para este repo, incluso si no menciona 'diagrams' explícitamente, por
   ejemplo 'dibujame la arquitectura de...', 'pasame este Mermaid a
-  diagrams_src' o 'agregale un WAF al diagrama de X'.
+  diagrams_src', 'agregale un WAF al diagrama de X' o 'quiero un diagrama
+  estilo Miro/pizarra colaborativa con tarjetas e íconos'.
 ---
 
 # diagrams-architect
@@ -116,6 +117,20 @@ en el IR del paso 1 — si te parece que falta algo importante (ej. un `Cluster`
 VPC implícito al decir "una instancia privada"), agregalo pero marcalo
 explícitamente como inferencia en el reporte, nunca en silencio.
 
+**Dos patrones de rendering, misma arquitectura por debajo:**
+
+- **Clásico (default):** `ClassName("label")` + `a >> Edge(...) >> b`. Más
+  corto, ya cumple todas las convenciones — usalo salvo que el pedido diga lo
+  contrario.
+- **Design system "pizarra/Miro" (opcional):** cuando el usuario pide
+  explícitamente una estética más visual/informal ("estilo Miro", "board
+  colaborativo", "pizarra", tarjetas con ícono+descripción, flechas numeradas
+  con badges), usá `service_card()` / `internal_card()` / `flow()` /
+  `sticky_note()` — ver `references/design_system.md` y copiá el bloque de
+  `assets/design_system_template.py`. Es una capa de *rendering* sobre el
+  mismo IR: no agrega, quita ni reinterpreta nodos/edges/clusters respecto del
+  paso 1, solo cambia cómo se dibujan.
+
 ### 5. Validar el `.py` generado (técnica + fidelidad)
 
 ```bash
@@ -176,12 +191,14 @@ solo "escrita". Separá siempre tres cosas en la respuesta al usuario:
 - No instales Graphviz ni ninguna dependencia — solo detectá y avisá.
 - Un diagrama por archivo en `diagrams_src/`; no mezcles varios pedidos en un
   mismo `.py` salvo que el usuario lo pida así.
-- **Tipografía: siempre `Helvetica-Bold`** (fallback `Arial`, después
-  `Times-Roman`). **Nunca uses `Bradley Hand` ni otras fuentes "hand-drawn"**,
-  ni siquiera si el pedido describe una estética informal/pizarra/Miro —
-  `scripts/validate_diagram.py` lo chequea y lo marca como error; conseguí ese
-  look con colores/clusters/sticky notes, no con la fuente (detalle en
-  `references/repo_conventions.md`).
+- **Tipografía: siempre `Helvetica-Bold`/`Helvetica`** (fallback `Arial`,
+  después `Times-Roman`). **Nunca uses `Bradley Hand` ni otras fuentes
+  "hand-drawn"**, ni siquiera si el pedido describe una estética
+  informal/pizarra/Miro — la regla aplica tanto a `fontname=...` como a un
+  `FACE="..."` dentro de un label HTML del design system;
+  `scripts/validate_diagram.py` chequea las dos formas y lo marca como error.
+  Conseguí el look "pizarra" con colores/clusters/cards/sticky notes (ver
+  `references/design_system.md`), no con la fuente.
 
 ## Fuera de alcance
 
@@ -202,3 +219,5 @@ grande, solo lo advertís.
 | `references/architecture_rules.md` | Detalle de las 5 reglas arquitectónicas y los principios de fidelidad no negociables |
 | `references/report_format.md` | Formato exacto del reporte final |
 | `references/repo_conventions.md` | Anatomía de un `.py` de este repo, si necesitás más detalle que el resumen de arriba |
+| `references/design_system.md` | Patrón opcional "pizarra/Miro": cards de servicio, badges numerados, estilos semánticos de conexión |
+| `assets/design_system_template.py` | Bloque copy-paste con los helpers del design system (`service_card`, `internal_card`, `flow`, `sticky_note`) |
