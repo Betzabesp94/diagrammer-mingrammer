@@ -160,10 +160,13 @@ Parámetros útiles de `Diagram`:
 | Parámetro | Para qué |
 |---|---|
 | `filename` | ruta de salida **sin** extensión (la agrega según `outformat`) |
-| `outformat` | `png` (default acá), `svg`, `pdf`, `jpg` |
-| `show=False` | no abrir el visor de imágenes al terminar |
+| `outformat` | `"png"` (default acá), `"svg"`, `"pdf"`, `"jpg"`, `"dot"` — también acepta una **lista** (`["png", "svg"]`) para renderizar varios formatos del mismo diagrama sin repetir el `with Diagram(...)` |
+| `show=False` | no abrir el visor de imágenes al terminar (**siempre** en scripts versionados / CI, ver mejores prácticas) |
 | `direction` | `LR` (izq→der), `TB` (arriba→abajo), `RL`, `BT` |
-| `graph_attr` | dict con atributos crudos de Graphviz (ej. `{"fontsize": "20"}`) |
+| `curvestyle` | `"ortho"` (default, líneas en ángulo recto) o `"curved"` |
+| `strict` | `True` colapsa aristas duplicadas entre el mismo par de nodos (útil si un loop puede generar la misma conexión más de una vez) |
+| `autolabel` | `True` antepone el nombre de la clase al label de cada nodo (ej. `EC2\nweb-1`) — útil en diagramas grandes o multi-proveedor donde el tipo de servicio no es obvio a simple vista |
+| `graph_attr` / `node_attr` / `edge_attr` | dicts con atributos crudos de Graphviz que se aplican a todo el grafo / todos los nodos / todas las aristas (ej. `graph_attr={"fontsize": "20"}`) |
 
 ---
 
@@ -263,8 +266,84 @@ Para ver todo lo que trae un módulo:
 ```
 
 Listado completo con las imágenes: <https://diagrams.mingrammer.com/docs/nodes/aws>.
-También hay `diagrams.gcp.*`, `diagrams.azure.*`, `diagrams.k8s.*`, `diagrams.onprem.*`
-(Postgres, Nginx, Kafka, Grafana…) y `diagrams.generic.*`.
+
+## Otros proveedores disponibles
+
+Todos se instalan con el mismo paquete `diagrams`, no hay packs adicionales que agregar:
+
+| Paquete | Cubre |
+|---|---|
+| `diagrams.gcp.*` | Compute, networking, BigQuery/Dataflow, IA/ML, IoT — mismos módulos que AWS (`compute`, `network`, `database`, `analytics`, `security`…) |
+| `diagrams.azure.*` | Compute, redes, DBs, DevOps, identidad — es el paquete con más submódulos (incluye `newicons` para íconos agregados en versiones recientes) |
+| `diagrams.k8s.*` | Recursos nativos de Kubernetes: `compute` (Pod, Deployment, StatefulSet), `network` (Service, Ingress), `storage`, `rbac`, `controlplane`, `podconfig` (ConfigMap, Secret) |
+| `diagrams.onprem.*` | Infra self-hosted / open source: `database` (Postgres, MySQL, Mongodb), `queue` (Kafka, RabbitMQ), `monitoring` (Grafana, Prometheus), `ci`/`cd` (Jenkins, ArgoCD), `network` (Nginx, Envoy), `vcs`, `iac` (Terraform, Ansible) |
+| `diagrams.generic.*` | Formas neutrales sin marca (`compute`, `network`, `storage`, `os`, `device`) — para cuando el diagrama no debe atarse a un proveedor concreto |
+| `diagrams.c4` | Elementos de notación **C4** (Person, Container, System, Relationship) para diagramas de arquitectura de software en vez de infraestructura |
+| `diagrams.programming.*` | Lenguajes y frameworks (útil para diagramas de stack técnico, no solo infra) |
+| `diagrams.saas.*` | Herramientas SaaS de terceros (Stripe, Twilio, Datadog, Slack…) |
+| `diagrams.alibabacloud`, `.oci`, `.ibm`, `.digitalocean`, `.openstack`, `.outscale`, `.elastic`, `.firebase`, `.gis` | Proveedores/nichos adicionales, mismo patrón de import que AWS/GCP/Azure |
+
+### Iconos personalizados con `Custom`
+
+Cuando un servicio no tiene ícono en ningún paquete (una herramienta interna, un SaaS no
+listado), se puede usar `diagrams.custom.Custom` con la ruta a un PNG local en vez de una clase
+de proveedor:
+
+```python
+from diagrams.custom import Custom
+
+mi_servicio = Custom("Servicio interno", "./assets/mi_logo.png")
+```
+
+Es el único caso en el que un nodo no viene de un módulo `diagrams.<provider>.*`; usarlo como
+último recurso, no como reemplazo de buscar primero el ícono oficial correcto.
+
+---
+
+## Mejores prácticas
+
+**Un diagrama por archivo, nombre de archivo = nombre del diagrama.** Así `make all` y
+`render.sh` producen una salida predecible en `output/`, y el diff de un cambio de arquitectura
+queda acotado a un solo `.py`.
+
+**Nombrá las variables por el rol en la arquitectura, no por el tipo de nodo.** `web`, `db`,
+`cola_eventos` se leen como el diagrama; `ec2_1`, `n2` no. El código es la documentación, así
+que tiene que poder leerse como una descripción de la infra.
+
+**`Cluster` es para límites reales, no para acomodar visualmente.** Usalo cuando el agrupamiento
+representa algo que existe en la infra (una VPC, una subnet, un namespace de k8s, un dominio de
+negocio). Anidarlos porque "quedan prolijos" sin que exista ese límite real hace que el diagrama
+mienta sobre la arquitectura.
+
+**Etiquetá una `Edge` solo cuando la flecha no se explica sola.** Un label, color o `style`
+("publica", `style="dashed"` para async, `color="firebrick"` para una ruta crítica) aporta
+cuando describe protocolo, sincronía o criticidad. Ponerle `Edge(...)` a cada conexión sin razón
+es ruido visual.
+
+**Elegí `direction` según el tipo de arquitectura**, no por default: `LR` para flujos de
+request/pipeline (entra por un lado, sale por el otro), `TB` para arquitecturas en capas
+(presentación / aplicación / datos apiladas verticalmente).
+
+**Preferí el ícono oficial del proveedor correcto antes que `generic.*` o `Custom`.** Un `EC2`
+mal elegido en vez de `ECS`/`Lambda` transmite una arquitectura distinta a la real. Reservá
+`generic.*` para cuando el diagrama es intencionalmente agnóstico de proveedor, y `Custom` solo
+cuando no existe ningún ícono aplicable.
+
+**Resolvé el `filename` de salida en base a `__file__`, no a un path relativo fijo** (como ya
+hacen `ejemplo_aws.py` y `plantilla.py`). Así el script produce el mismo resultado sin importar
+desde qué directorio se lo ejecute.
+
+**`show=False` siempre en scripts versionados.** Corren en CI o en la máquina de otra persona,
+que puede no tener un visor de imágenes configurado; `show=True` (el default de la librería) es
+solo para uso interactivo puntual.
+
+**Si necesitás dos formatos del mismo diagrama, usá `outformat=["png", "svg"]`** en vez de dos
+bloques `with Diagram(...)` — evita duplicar la definición de nodos y aristas.
+
+**Como es Python, generá diagramas grandes con datos, no a mano.** Un loop corto sobre una lista
+o un `dict` de infraestructura (por ejemplo, leído de un YAML) es preferible a copiar y pegar
+`EC2("web-N")` diez veces; si el loop puede generar la misma conexión más de una vez, pasá
+`strict=True` a `Diagram` para que Graphviz la colapse en una sola arista.
 
 ---
 
@@ -290,3 +369,13 @@ adentro de un README y querés que se vea sin generar nada, Mermaid gana.
 ## Licencia y costo
 
 `diagrams` es MIT y Graphviz es EPL: todo local, gratis, sin cuentas ni límites de uso.
+
+---
+
+## Skill de Claude Code (en evaluación)
+
+Se está evaluando documentar una Skill de Claude Code que escriba los `.py` de
+`diagrams_src/` a partir de un pedido del usuario. El análisis de qué formato de input conviene
+(prompt en lenguaje natural vs. una sintaxis tipo Eraser vs. Mermaid) y el alcance propuesto para
+esa skill están en [`docs/claude-code-skill-scope.md`](docs/claude-code-skill-scope.md). La skill
+todavía no existe; ese documento es solo la investigación previa.
