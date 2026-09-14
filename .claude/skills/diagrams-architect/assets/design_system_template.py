@@ -20,6 +20,7 @@ patrón clásico ya cumple todas las convenciones del repo con menos código.
 """
 
 import diagrams
+import html
 from pathlib import Path
 
 # --- Tipografia: misma regla dura que el resto del repo ---------------------
@@ -81,6 +82,9 @@ def service_card(container, node_id: str, node_cls, title: str, subtitle: str, d
     scripts/introspect_diagrams.py). `container` es el Cluster o Diagram
     donde vive el nodo; ambos exponen `.node(id, label, **attrs)`."""
     icon = _icon_file(node_cls)
+    title = html.escape(title, quote=True)
+    subtitle = html.escape(subtitle, quote=True)
+    description = html.escape(description, quote=True)
     label = (
         "<"
         f'<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" '
@@ -98,6 +102,8 @@ def service_card(container, node_id: str, node_cls, title: str, subtitle: str, d
 def internal_card(container, node_id: str, title: str, description: str) -> str:
     """Card para un componente SIN icono oficial (confianza generic/custom
     del IR): borde punteado, sin icono."""
+    title = html.escape(title, quote=True)
+    description = html.escape(description, quote=True)
     label = (
         "<"
         f'<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="6" '
@@ -130,6 +136,7 @@ def flow(diagram, source_id: str, target_id: str, number: int, text: str, kind: 
     `diagram.dot.edge(...)` (atributo publico) porque ya no hay objetos Node
     de por medio para usar `>>`."""
     style = EDGE_STYLES[kind]
+    text = html.escape(text, quote=True)
     label = (
         "<"
         '<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2" CELLPADDING="0"><TR>'

@@ -51,6 +51,7 @@ chequea las dos formas.
 
 ```python
 import diagrams
+import html
 from pathlib import Path
 
 _ICONS_BASE = Path(diagrams.__file__).resolve().parent.parent
@@ -65,6 +66,9 @@ def _icon_file(node_cls) -> str:
 
 def service_card(container, node_id, node_cls, title, subtitle, description):
     icon = _icon_file(node_cls)
+    title = html.escape(title, quote=True)
+    subtitle = html.escape(subtitle, quote=True)
+    description = html.escape(description, quote=True)
     label = (
         "<"
         f'<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" '
@@ -100,6 +104,8 @@ simple vista de un servicio con ícono real:
 
 ```python
 def internal_card(container, node_id, title, description):
+    title = html.escape(title, quote=True)
+    description = html.escape(description, quote=True)
     label = (
         "<"
         f'<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="6" '
@@ -124,6 +130,7 @@ EDGE_STYLES = {
 
 def flow(diagram, source_id, target_id, number, text, kind="runtime"):
     style = EDGE_STYLES[kind]
+    text = html.escape(text, quote=True)
     label = (
         "<"
         '<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2" CELLPADDING="0"><TR>'
