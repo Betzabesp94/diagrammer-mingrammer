@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Renderiza un diagrama de diagrams_src/ dentro de output/.
+# Renderiza un diagrama de diagrams_src/ (o diagrams_ref/) dentro de output/.
 #
 #   ./render.sh ejemplo_aws.py           -> output/ejemplo_aws.png
 #   FORMAT=svg ./render.sh ejemplo_aws   -> output/ejemplo_aws.svg
@@ -10,6 +10,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$ROOT/diagrams_src"
+REF_DIR="$ROOT/diagrams_ref"
 OUT_DIR="$ROOT/output"
 FORMAT="${FORMAT:-png}"
 
@@ -59,8 +60,8 @@ uso: ./render.sh <script.py>        (o solo el nombre, o la ruta completa)
      FORMAT=svg ./render.sh <script.py>
      ./render.sh --check
 
-scripts disponibles en diagrams_src/:
-$(ls "$SRC_DIR"/*.py 2>/dev/null | xargs -n1 basename | sed 's/^/  /' || echo "  (ninguno)")
+scripts disponibles en diagrams_src/ y diagrams_ref/:
+$(ls "$SRC_DIR"/*.py "$REF_DIR"/*.py 2>/dev/null | xargs -n1 basename | sed 's/^/  /' || echo "  (ninguno)")
 EOF
   exit 1
 fi
@@ -72,7 +73,8 @@ arg="$1"
 if   [[ -f "$arg" ]];             then SCRIPT="$arg"
 elif [[ -f "$SRC_DIR/$arg" ]];    then SCRIPT="$SRC_DIR/$arg"
 elif [[ -f "$SRC_DIR/$(basename "$arg")" ]]; then SCRIPT="$SRC_DIR/$(basename "$arg")"
-else die "no encontré '$1' (ni en el directorio actual ni en diagrams_src/)."
+elif [[ -f "$REF_DIR/$(basename "$arg")" ]]; then SCRIPT="$REF_DIR/$(basename "$arg")"
+else die "no encontré '$1' (ni en el directorio actual, ni en diagrams_src/ ni en diagrams_ref/)."
 fi
 
 check_prereqs

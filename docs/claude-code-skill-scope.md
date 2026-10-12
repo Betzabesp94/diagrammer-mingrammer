@@ -8,7 +8,7 @@
 Que Claude Code, al recibir un pedido de diagrama de arquitectura, **modele, valide y traduzca**
 esa intención en un script `.py` correcto en `diagrams_src/`, usando la librería
 [`diagrams`](https://diagrams.mingrammer.com/) de este repo (siguiendo la convención de
-`plantilla.py`), y opcionalmente lo renderice con `render.sh` / `make render`.
+`diagrams_ref/plantilla.py`), y opcionalmente lo renderice con `render.sh` / `make render`.
 
 Una distinción central del diseño: **"el código funciona" no es lo mismo que "el diagrama es
 correcto"**. Un script puede ser Python válido, importar clases reales de `diagrams` y renderizar
@@ -28,7 +28,7 @@ al momento de escribir este documento — **no como verdad permanente**:
 > - la versión instalada (`importlib.metadata.version("diagrams")`),
 > - los módulos y clases realmente disponibles (introspección real — `dir(modulo)`, intento de
 >   `import` — nunca solo lo que "suena correcto" por conocimiento del modelo),
-> - las convenciones vigentes del repo (`plantilla.py`, `render.sh`, `Makefile`,
+> - las convenciones vigentes del repo (`diagrams_ref/plantilla.py`, `render.sh`, `Makefile`,
 >   `requirements.txt`).
 >
 > Si el repo actualiza la versión de `diagrams`, este documento puede quedar desactualizado en
@@ -57,7 +57,7 @@ al momento de escribir este documento — **no como verdad permanente**:
   avisar con instrucciones si falta, tal como ya hace este repo.
 - **Convención de salida del repo**: `OUT = Path(__file__).resolve().parent.parent / "output" / "<nombre>"`,
   `FMT = os.getenv("FORMAT", "png")` — la skill debe generar el `.py` siguiendo exactamente este
-  patrón (visto en `ejemplo_aws.py` y `plantilla.py`) para que `render.sh`/`make render` funcionen
+  patrón (visto en `diagrams_ref/ejemplo_aws.py` y `diagrams_ref/plantilla.py`) para que `render.sh`/`make render` funcionen
   sin cambios.
 
 ## 3. La pregunta central: ¿qué formato de input le conviene a Claude Code?
@@ -191,7 +191,7 @@ como imagen suelta ni como Mermaid.
 
 **Proceso (pipeline propuesto):**
 1. **Inspeccionar el repo y la instalación real** de `diagrams` (versión, módulos, clases,
-   convenciones de `plantilla.py`/`render.sh`/`Makefile`) — nunca asumir lo descrito en la
+   convenciones de `diagrams_ref/plantilla.py`/`render.sh`/`Makefile`) — nunca asumir lo descrito en la
    sección 2 como definitivo.
 2. **Extraer la intención arquitectónica** del prompt (o del input estructurado alternativo).
 3. **Construir el modelo intermedio** (sección 4): nodos, clusters, aristas con protocolo/tipo,
@@ -200,7 +200,7 @@ como imagen suelta ni como Mermaid.
    *antes* de escribir una sola línea de Python.
 5. **Resolver cada nodo a una clase real** de `diagrams.<provider>.*` con su nivel de confianza
    (sección 4); si no hay ícono oficial, usar `diagrams.custom.Custom` y marcarlo explícitamente.
-6. **Generar el `.py`** en `diagrams_src/<slug>.py` siguiendo el patrón de `plantilla.py`
+6. **Generar el `.py`** en `diagrams_src/<slug>.py` siguiendo el patrón de `diagrams_ref/plantilla.py`
    (`OUT` vía `__file__`, `FMT` vía `os.getenv`, `show=False`).
 7. **Validación técnica/estática** del Python generado (sección 6).
 8. **Renderizar** con `render.sh`/`make render` (o avisar si falta Graphviz, sin intentar
@@ -278,7 +278,7 @@ Graphviz pueda renderizarlo. Debe validar tres dimensiones distintas:
 - Hay un `Diagram` activo antes de crear cualquier `Node` (si no, la librería lanza
   `EnvironmentError` — debe evitarse, no capturarse después).
 - `show=False`, `filename` sin extensión, `FORMAT` respetado vía `os.getenv`, `OUT` resuelto
-  igual que en `plantilla.py`.
+  igual que en `diagrams_ref/plantilla.py`.
 - No se agregan dependencias nuevas no autorizadas al `requirements.txt`.
 - El render con Graphviz termina sin error (o, si Graphviz no está instalado, se informa el
   problema operacional en vez de fallar en silencio).
@@ -391,7 +391,7 @@ carpeta nueva dentro de `diagrams_src/`.
 
 | Caso | Qué prueba |
 |---|---|
-| AWS, 5 nodos (equivalente a `ejemplo_aws.py`) | Caso básico end-to-end |
+| AWS, 5 nodos (equivalente a `diagrams_ref/ejemplo_aws.py`) | Caso básico end-to-end |
 | VPC con subnets anidadas | Clusters anidados |
 | CloudFront → WAF → ALB → ECS → RDS | Topología con varias conexiones (cobertura de aristas) |
 | Lambda + API Gateway | Mapeo de servicios serverless |
