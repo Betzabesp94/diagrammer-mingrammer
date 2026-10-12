@@ -1,6 +1,6 @@
 # Convenciones de este repo (diagrammer-mingrammer)
 
-Confirmadas leyendo `diagrams_src/plantilla.py`, `diagrams_src/ejemplo_aws.py`,
+Confirmadas leyendo `diagrams_ref/plantilla.py`, `diagrams_ref/ejemplo_aws.py`,
 `Makefile` y `render.sh` — no asumidas de memoria. Si esos archivos cambian en el
 futuro, estas notas pueden quedar desactualizadas; en caso de duda, releelos.
 

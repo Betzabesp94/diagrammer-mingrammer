@@ -12,7 +12,7 @@ help:
 	@echo "  make check                          verifica python, graphviz y diagrams"
 	@echo "  make render FILE=ejemplo_aws.py     genera output/ejemplo_aws.png"
 	@echo "  make render FILE=ejemplo_aws.py FMT=svg"
-	@echo "  make all                            renderiza todos los .py de diagrams_src/"
+	@echo "  make all                            renderiza todos los .py de diagrams_src/ y diagrams_ref/"
 	@echo "  make clean                          vacía output/"
 
 install:
@@ -32,7 +32,7 @@ render:
 
 all:
 	@shopt -s nullglob; \
-	for f in diagrams_src/[!_]*.py; do FORMAT=$(FMT) ./render.sh "$$f"; done
+	for f in diagrams_ref/[!_]*.py diagrams_src/[!_]*.py; do FORMAT=$(FMT) ./render.sh "$$f"; done
 
 clean:
 	@find output -mindepth 1 ! -name .gitkeep -delete

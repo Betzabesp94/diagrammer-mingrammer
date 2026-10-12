@@ -1,6 +1,6 @@
 """Bloque copy-paste del design system "pizarra colaborativa" (estilo Miro).
 
-Cómo usarlo (igual que diagrams_src/plantilla.py):
+Cómo usarlo (igual que diagrams_ref/plantilla.py):
     1. Copiá todo este bloque al principio de tu diagrams_src/<slug>.py, justo
        después de resolver OUT/FMT.
     2. Ajustá los colores de ZONE_* si querés otra paleta pastel.

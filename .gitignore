@@ -8,6 +8,10 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 
+# Diagramas generados por usuarios (los de referencia viven en diagrams_ref/)
+/diagrams_src/*
+!/diagrams_src/.gitkeep
+
 # Imágenes generadas
 /output/*
 !/output/.gitkeep

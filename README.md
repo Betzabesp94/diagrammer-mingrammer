@@ -86,9 +86,10 @@ make check
 ## Estructura
 
 ```
-diagrams_src/       scripts .py, uno por diagrama
+diagrams_ref/       scripts de referencia (versionados)
   ejemplo_aws.py    el ejemplo: Route53 -> ELB -> 2x EC2 (en una VPC) -> RDS
   plantilla.py      esqueleto para copiar y empezar uno nuevo
+diagrams_src/       tus diagramas .py, uno por diagrama (ignorado por git)
 output/             imágenes generadas (gitignored)
 docs/               imágenes que se muestran en este README (esas sí versionadas)
 render.sh           wrapper de render
@@ -103,7 +104,7 @@ requirements.txt    diagrams==0.25.1
 Correr el `.py` **ya genera la imagen** — no hay un paso de CLI aparte:
 
 ```bash
-python diagrams_src/ejemplo_aws.py     # -> output/ejemplo_aws.png
+python diagrams_ref/ejemplo_aws.py     # -> output/ejemplo_aws.png
 ```
 
 Los atajos hacen lo mismo pero se encargan del venv, del formato y de verificar Graphviz:
@@ -111,7 +112,7 @@ Los atajos hacen lo mismo pero se encargan del venv, del formato y de verificar 
 ```bash
 make render FILE=ejemplo_aws.py            # -> output/ejemplo_aws.png
 make render FILE=ejemplo_aws.py FMT=svg    # -> output/ejemplo_aws.svg
-make all                                   # renderiza todos los .py de diagrams_src/
+make all                                   # renderiza todos los .py de diagrams_ref/ y diagrams_src/
 make clean                                 # vacía output/
 
 ./render.sh ejemplo_aws                    # equivalente, sin make
@@ -125,7 +126,7 @@ Formatos soportados por `outformat`: `png`, `svg`, `pdf`, `jpg`, `dot`.
 ## Cómo crear un diagrama nuevo
 
 ```bash
-cp diagrams_src/plantilla.py diagrams_src/mi_diagrama.py
+cp diagrams_ref/plantilla.py diagrams_src/mi_diagrama.py
 # editás el archivo
 make render FILE=mi_diagrama.py
 ```

@@ -22,6 +22,10 @@ description: >-
 Genera diagramas de arquitectura como código versionable (`diagrams_src/<slug>.py`)
 usando la librería Python `diagrams`, siguiendo las convenciones de este repo.
 
+> **Carpetas:** `diagrams_ref/` guarda las referencias versionadas (`plantilla.py`,
+> `ejemplo_aws.py`; solo se leen). `diagrams_src/` es donde se escriben los diagramas
+> nuevos y está en `.gitignore`: nunca los agregues a git.
+
 La idea central: **"el código funciona" no es lo mismo que "el diagrama es
 correcto"**. Un script puede ser Python válido, importar clases reales y
 renderizar sin error en Graphviz, y aun así representar una arquitectura
@@ -38,7 +42,7 @@ No asumas versiones ni convenciones de memoria. Al empezar cada tarea:
    .venv/bin/python .claude/skills/diagrams-architect/scripts/introspect_diagrams.py version
    ./render.sh --check   # avisa si falta Graphviz — nunca lo instales vos
    ```
-2. Si algo en `diagrams_src/plantilla.py`, `diagrams_src/ejemplo_aws.py`, `Makefile`
+2. Si algo en `diagrams_ref/plantilla.py`, `diagrams_ref/ejemplo_aws.py`, `Makefile`
    o `render.sh` parece distinto de lo descrito en
    `references/repo_conventions.md`, confiá en el archivo real, no en la
    referencia — y si notás una diferencia real, decilo en el reporte.
