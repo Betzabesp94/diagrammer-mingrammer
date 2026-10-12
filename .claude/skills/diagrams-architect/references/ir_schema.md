@@ -1,111 +1,55 @@
-# Modelo intermedio de arquitectura (IR)
+# IR canónico v2
 
-Representación estructurada que la skill arma internamente entre "lo que pidió el
-usuario" y "el código Python". No hace falta guardarlo como archivo salvo que se use
-`--ir` con `scripts/validate_diagram.py` o `scripts/validate_architecture.py` — en
-ese caso escribilo a un archivo temporal en el workspace (no en `diagrams_src/`).
-
-## Por qué existe
-
-Pasar directo de una frase a `CloudFront() >> ALB() >> ECS()` hace que sea fácil
-"perder" una conexión en arquitecturas largas, o mapear un servicio al ícono
-equivocado sin darse cuenta. El IR separa dos preguntas que conviene no mezclar:
-**¿qué arquitectura es?** (este archivo) y **¿cómo se dibuja?** (el `.py`).
-
-## Forma
+Es la única fuente de verdad: el `.py` se genera a partir de él y no se escribe a mano. Lo produce
+`resolve_ir.py` a partir del `.diag`; el modelo casi nunca lo escribe. El contrato formal es
+`ir.schema.json` (lo interpreta `validate_ir.py`). Las reglas entre campos están abajo.
 
 ```json
 {
-  "provider": "aws",
-  "nodes": [
-    {
-      "id": "cloudfront",
-      "service": "Amazon CloudFront",
-      "diagrams_class": "diagrams.aws.network.CloudFront",
-      "confidence": "exact",
-      "tags": {}
-    },
-    {
-      "id": "alb",
-      "service": "Application Load Balancer",
-      "diagrams_class": "diagrams.aws.network.ELB",
-      "confidence": "exact",
-      "tags": {}
-    },
-    {
-      "id": "db",
-      "service": "Amazon RDS Postgres",
-      "diagrams_class": "diagrams.aws.database.RDS",
-      "confidence": "exact",
-      "tags": {"multi_az": true}
-    }
-  ],
-  "clusters": [
-    {"id": "vpc", "contains": ["alb", "db"]}
-  ],
-  "edges": [
-    {"source": "cloudfront", "target": "alb", "protocol": "HTTPS", "type": "network"},
-    {"source": "alb", "target": "db", "protocol": "TCP/5432", "type": "network"}
-  ],
-  "constraints": {
-    "internet_entrypoint": "cloudfront",
-    "production": true,
-    "notes": "arquitectura productiva, mencionó alta disponibilidad"
-  }
+  "schema_version": 2, "title": "Web app", "slug": "web_app", "provider": "aws", "direction": "LR",
+  "nodes":    [{"id": "api", "var": "api", "label": "API", "label_wrapped": "API",
+                "icon": "aws-api-gateway", "diagrams_class": "diagrams.aws.network.APIGateway",
+                "confidence": "exact", "cluster": "vpc", "standalone": false, "role": "service",
+                "tags": {}, "extensions": {}}],
+  "clusters": [{"id": "vpc", "label": "VPC", "parent": null, "zone": 0, "boundary": true, "extensions": {}}],
+  "edges":    [{"id": "e1", "source": "web", "target": "api", "arrow": "forward", "label": "HTTPS",
+                "type": "network", "emphasis": false, "role": "flow", "extensions": {}}],
+  "constraints": {"internet_entrypoint": "web", "production": true},
+  "style_overrides": {}, "legend": {"auto": true, "entries": []}, "unsupported": [], "meta": {}
 }
 ```
 
-### Campos de `nodes[]`
+## Campos que calcula `resolve_ir.py` (el generador no decide nada)
 
-| Campo | Uso |
+| Campo | Qué es |
 |---|---|
-| `id` | identificador interno estable (se usa en `edges`/`clusters`), no el nombre visible |
-| `service` | como lo nombró o describió el usuario ("Application Load Balancer", "un balanceador") |
-| `diagrams_class` | path completo verificado con `scripts/introspect_diagrams.py check` — nunca un path adivinado |
-| `confidence` | `exact` / `inferred` / `generic` / `custom` / `ambiguous` (ver tabla abajo) |
-| `tags` | metadata libre usada por `validate_architecture.py` (`multi_az`, `multi_region`, u otras que agregues) |
+| `nodes[].var` | nombre de variable Python, único, sin pisar palabras reservadas ni builtins (`list` → `list_`) |
+| `nodes[].label_wrapped` | label con saltos de línea según `LABEL_WRAP` |
+| `nodes[].diagrams_class` | clase real; `diagrams.generic.blank.Blank` si no hay clase oficial |
+| `nodes[].confidence` | ver tabla de abajo |
+| `clusters[].zone` | índice de color: distinto de sus hermanos y de su padre |
+| `edges[].type` | `network` si no se indicó |
+| `legend` | entradas de la leyenda automática; sus nodos, cluster y aristas llevan `role: "legend"` |
 
-### Niveles de confianza
+## `confidence`
 
-| Nivel | Significa | Qué hace la skill |
+| Valor | Cuándo | Acción |
 |---|---|---|
-| `exact` | Hay una clase 1:1 verificada para el servicio nombrado | Usarla directo, sin nota especial en el reporte |
-| `inferred` | El usuario describió un rol ("servicio interno de procesamiento"), no un servicio puntual | Usar una clase razonable y **reportarla** para que el usuario la confirme |
-| `generic` | No hay ícono oficial de ningún proveedor para eso | Usar `diagrams.generic.*` y reportarlo |
-| `custom` | Tampoco hay ícono genérico aplicable | Usar `diagrams.custom.Custom` y reportar qué ícono/ruta se usó |
-| `ambiguous` | Dos o más clases son igual de plausibles | Preguntar solo si la ambigüedad cambia la arquitectura de forma significativa; si no, elegir y reportar |
+| `exact` | `icon:` resuelto a una sola clase | nada |
+| `inferred` | clase deducida del nombre, o varias candidatas | se lista en el reporte (`RES002`, `RES004`) |
+| `generic` | sin clase oficial | icono genérico y `RES003` (WARNING) |
+| `custom`, `ambiguous` | reservados | sin uso hoy |
 
-**Regla dura:** un nodo nunca pasa a `diagrams_class` sin que `introspect_diagrams.py
-check` (o `search`) haya confirmado que existe. Si no existe, se degrada de
-`exact`/`inferred` a `generic` o `custom` — nunca se inventa un path porque "suena
-correcto" (ver el caso real `aws.bedrock.Bedrock`, que no existe: la clase real es
-`diagrams.aws.ml.Bedrock`).
+## Invariantes (las comprueba `validate_ir.py`)
 
-### Campos de `edges[]`
+- Ids `^[a-z][a-z0-9_]*$`, únicos entre nodos y clusters; los clusters no pueden empezar con `cluster_`.
+- Un nodo pertenece a un solo cluster (`nodes[].cluster`); el anidamiento sale de `clusters[].parent`, sin ciclos.
+- Cada arista une nodos existentes. `A < B` se normaliza a `B > A`; `arrow` ∈ `forward|both|none`.
+- Los labels de cluster son únicos en todo el diagrama.
+- Mismo `.diag` y mismas versiones → mismo IR, byte a byte (`irlib.dump_json`).
 
-`type` distingue una llamada de red directa (`network`) de una notificación
-asíncrona (`event`, típico de `S3 → Lambda` o `SQS/SNS/EventBridge → Lambda`), un
-flujo de datos (`data`), una invocación (`invocation`), una dependencia en tiempo
-de build/deploy (`dependency`) o un chequeo de identidad (`authentication`). Esto
-le permite a la skill decidir el estilo de la `Edge` en el `.py` (sólida para
-`network`, `style="dashed"` con label para `event`, etc.) en vez de dibujar todo
-igual.
+## Expresividad, en este orden
 
-### `constraints`
-
-Objeto libre. Los campos que hoy usa `scripts/validate_architecture.py`:
-
-- `internet_entrypoint`: id del nodo que recibe tráfico público (si existe).
-- `production` (bool) — o, si no está explícito, el script también busca palabras
-  como "producción"/"production"/"alta disponibilidad" en cualquier valor string
-  del objeto (ej. en `notes`).
-
-Se puede extender con más campos libres; el script solo lee lo que conoce y
-ninguna clave rara rompe nada.
-
-## Multi-cloud
-
-Un solo IR puede tener nodos con distinto `diagrams_class` de distintos
-proveedores (`diagrams.aws.*`, `diagrams.gcp.*`, ...). Usá un `Cluster` por
-proveedor o por boundary lógico si ayuda a la lectura, pero no es obligatorio —
-depende de si el usuario pidió agrupar por proveedor o por función.
+`tags` (metadato) → `extensions` (atributo de Graphviz, INFO `RES011`) → `unsupported`
+(`{where, feature, detail, severity}`, `RES010`; nunca se descarta en silencio) → extender el esquema
+subiendo `schema_version`, solo si el caso se repite.

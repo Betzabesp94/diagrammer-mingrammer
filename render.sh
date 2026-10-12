@@ -22,14 +22,14 @@ die() { rojo "error: $*"; exit 1; }
 hint_graphviz() {
   cat >&2 <<'EOF'
 
-Graphviz es una dependencia del SISTEMA (no un paquete Python). Instalalo con:
+Graphviz es una dependencia del SISTEMA (no un paquete Python). Instálalo con:
 
   macOS          brew install graphviz
   Ubuntu/Debian  sudo apt install graphviz
   Fedora         sudo dnf install graphviz
   Windows        choco install graphviz   (o: winget install Graphviz.Graphviz)
 
-Verificá con: dot -V
+Verifica con: dot -V
 EOF
 }
 
@@ -43,7 +43,7 @@ fi
 
 check_prereqs() {
   command -v dot >/dev/null 2>&1 || { rojo "error: no encontré el binario 'dot' (Graphviz)."; hint_graphviz; exit 1; }
-  "$PYTHON" -c "import diagrams" 2>/dev/null || die "la librería 'diagrams' no está instalada. Corré: make install"
+  "$PYTHON" -c "import diagrams" 2>/dev/null || die "la librería 'diagrams' no está instalada. Ejecuta: make install"
 }
 
 if [[ "${1:-}" == "--check" ]]; then
@@ -88,5 +88,5 @@ if [[ -f "$generado" ]]; then
   verde "listo: ${generado#"$ROOT"/}"
 else
   # El script puede usar otro nombre de salida que el del archivo .py.
-  verde "listo (revisá output/)"
+  verde "listo (revisa output/)"
 fi

@@ -44,10 +44,10 @@ choco install graphviz
 winget install Graphviz.Graphviz
 ```
 
-En Windows, si después de instalar `dot` no se encuentra, agregá a mano
-`C:\Program Files\Graphviz\bin` al `PATH` y abrí una terminal nueva.
+En Windows, si después de instalar `dot` no se encuentra, agrega a mano
+`C:\Program Files\Graphviz\bin` al `PATH` y abre una terminal nueva.
 
-Verificá que quedó bien:
+Verifica que quedó bien:
 
 ```bash
 dot -V
@@ -64,7 +64,7 @@ git clone <este-repo> && cd diagrammer-mingrammer
 make install          # crea .venv, instala requirements.txt y verifica los prerequisitos
 ```
 
-O a mano, si preferís:
+O a mano, si prefieres:
 
 ```bash
 python3 -m venv .venv
@@ -86,14 +86,12 @@ make check
 ## Estructura
 
 ```
-diagrams_ref/       scripts de referencia (versionados)
-  ejemplo_aws.py    el ejemplo: Route53 -> ELB -> 2x EC2 (en una VPC) -> RDS
-  plantilla.py      esqueleto para copiar y empezar uno nuevo
-diagrams_src/       tus diagramas .py, uno por diagrama (ignorado por git)
-output/             imágenes generadas (gitignored)
+diagrams_ref/       referencias versionadas: plantilla y ejemplo_aws (.diag, .ir.json y .py generado)
+diagrams_src/       tus diagramas (.diag, .ir.json, .py); ignorado por git
+output/             imágenes, layout y reportes generados (gitignored)
 docs/               imágenes que se muestran en este README (esas sí versionadas)
 render.sh           wrapper de render
-Makefile            atajos: install / check / render / all / clean
+Makefile            atajos: install / check / render / all / clean / diagram / validate / test / evals
 requirements.txt    diagrams==0.25.1
 ```
 
@@ -125,9 +123,34 @@ Formatos soportados por `outformat`: `png`, `svg`, `pdf`, `jpg`, `dot`.
 
 ## Cómo crear un diagrama nuevo
 
+El flujo recomendado describe la arquitectura en un archivo `.diag` y deja que el pipeline genere,
+valide y renderice el `.py`. Es determinista: el mismo `.diag` produce siempre el mismo `.py` y el mismo
+render, y el estilo vive en un único bloque `# === STYLE ===`.
+
+```bash
+cp diagrams_ref/plantilla.diag diagrams_src/mi_diagrama.diag
+# edita el archivo (la sintaxis está comentada dentro de la plantilla)
+make diagram IN=diagrams_src/mi_diagrama.diag
+```
+
+`make diagram` encadena `parse_dsl → resolve_ir → validate_ir → validate_architecture → generate_diagram →
+validate_code → render → validate_layout → check_determinism` y deja `output/mi_diagrama.report.json` con el
+resultado (`PASS`, `WARN` o `FAIL`), los avisos y las versiones de `diagrams` y Graphviz. Nunca edites el
+`.py` generado: cambia el `.diag` y vuelve a ejecutar. La sintaxis completa está en
+[`references/dsl.md`](.claude/skills/diagrams-architect/references/dsl.md) y el catálogo de avisos en
+[`references/validations.md`](.claude/skills/diagrams-architect/references/validations.md).
+
+```bash
+make test     # pruebas de la skill
+make evals    # casos verificables por script
+```
+
+### Escribir el `.py` a mano
+
+Sigue siendo posible, y `make validate FILE=diagrams_src/mi_diagrama.py` lo revisa en modo permisivo.
+
 ```bash
 cp diagrams_ref/plantilla.py diagrams_src/mi_diagrama.py
-# editás el archivo
 make render FILE=mi_diagrama.py
 ```
 
@@ -239,7 +262,7 @@ with Diagram("Entre grupos", show=False, direction="LR"):
     worker >> Edge(color="firebrick") >> base
 ```
 
-Como es Python, podés usar loops, condicionales, listas y funciones para generar el diagrama
+Como es Python, puedes usar loops, condicionales, listas y funciones para generar el diagrama
 (por ejemplo, armar N réplicas desde una lista o leer un YAML de infraestructura).
 
 ---
@@ -311,7 +334,7 @@ queda acotado a un solo `.py`.
 `cola_eventos` se leen como el diagrama; `ec2_1`, `n2` no. El código es la documentación, así
 que tiene que poder leerse como una descripción de la infra.
 
-**`Cluster` es para límites reales, no para acomodar visualmente.** Usalo cuando el agrupamiento
+**`Cluster` es para límites reales, no para acomodar visualmente.** Úsalo cuando el agrupamiento
 representa algo que existe en la infra (una VPC, una subnet, un namespace de k8s, un dominio de
 negocio). Anidarlos porque "quedan prolijos" sin que exista ese límite real hace que el diagrama
 mienta sobre la arquitectura.
@@ -321,7 +344,7 @@ mienta sobre la arquitectura.
 cuando describe protocolo, sincronía o criticidad. Ponerle `Edge(...)` a cada conexión sin razón
 es ruido visual.
 
-**Elegí `direction` según el tipo de arquitectura**, no por default: `LR` para flujos de
+**Elige `direction` según el tipo de arquitectura**, no por default: `LR` para flujos de
 request/pipeline (entra por un lado, sale por el otro), `TB` para arquitecturas en capas
 (presentación / aplicación / datos apiladas verticalmente).
 
@@ -338,12 +361,12 @@ desde qué directorio se lo ejecute.
 que puede no tener un visor de imágenes configurado; `show=True` (el default de la librería) es
 solo para uso interactivo puntual.
 
-**Si necesitás dos formatos del mismo diagrama, usá `outformat=["png", "svg"]`** en vez de dos
+**Si necesitas dos formatos del mismo diagrama, usa `outformat=["png", "svg"]`** en vez de dos
 bloques `with Diagram(...)` — evita duplicar la definición de nodos y aristas.
 
-**Como es Python, generá diagramas grandes con datos, no a mano.** Un loop corto sobre una lista
+**Como es Python, genera diagramas grandes con datos, no a mano.** Un loop corto sobre una lista
 o un `dict` de infraestructura (por ejemplo, leído de un YAML) es preferible a copiar y pegar
-`EC2("web-N")` diez veces; si el loop puede generar la misma conexión más de una vez, pasá
+`EC2("web-N")` diez veces; si el loop puede generar la misma conexión más de una vez, pasa
 `strict=True` a `Diagram` para que Graphviz la colapse en una sola arista.
 
 ---
@@ -363,7 +386,7 @@ o un `dict` de infraestructura (por ejemplo, leído de un YAML) es preferible a 
 
 **Regla práctica:** si el diagrama tiene que mostrar servicios cloud reconocibles y va a una
 presentación o a un documento de arquitectura, `diagrams` gana. Si es un flujo lógico que vive
-adentro de un README y querés que se vea sin generar nada, Mermaid gana.
+adentro de un README y quieres que se vea sin generar nada, Mermaid gana.
 
 ---
 
@@ -373,10 +396,10 @@ adentro de un README y querés que se vea sin generar nada, Mermaid gana.
 
 ---
 
-## Skill de Claude Code (en evaluación)
+## Skill de Claude Code
 
-Se está evaluando documentar una Skill de Claude Code que escriba los `.py` de
-`diagrams_src/` a partir de un pedido del usuario. El análisis de qué formato de input conviene
-(prompt en lenguaje natural vs. una sintaxis tipo Eraser vs. Mermaid) y el alcance propuesto para
-esa skill están en [`docs/claude-code-skill-scope.md`](docs/claude-code-skill-scope.md). La skill
-todavía no existe; ese documento es solo la investigación previa.
+La skill `diagrams-architect` (en `.claude/skills/diagrams-architect/`) convierte un pedido en lenguaje
+natural, una sintaxis tipo eraser.io o un Mermaid en un diagrama de este repo siguiendo el flujo de
+arriba. El modelo solo escribe el `.diag`; los scripts generan el código y verifican conectividad, texto,
+layout, estilo y determinismo. La investigación previa está en
+[`docs/claude-code-skill-scope.md`](docs/claude-code-skill-scope.md) (documento histórico).

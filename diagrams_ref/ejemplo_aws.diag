@@ -1,0 +1,27 @@
+// Ejemplo de referencia: aplicación web en tres capas dentro de una VPC.
+// Se compila con:  make diagram IN=diagrams_ref/ejemplo_aws.diag
+title: Aplicación web en AWS
+direction: LR
+entrypoint: Usuarios
+production: true
+
+Usuarios [icon: aws-users]
+DNS [icon: aws-route53, label: "Route 53"]
+
+VPC [boundary: true] {
+  Subred pública [boundary: true] {
+    ALB [icon: aws-alb, label: "Balanceador de carga"]
+  }
+  Subred de aplicación [boundary: true] {
+    Web 1 [icon: aws-ec2]
+    Web 2 [icon: aws-ec2]
+  }
+  Subred de datos [boundary: true] {
+    DB [icon: aws-rds, label: "Base de datos", tag.multi_az: true]
+  }
+}
+
+Usuarios > DNS: "consulta DNS"
+Usuarios > ALB: "HTTPS"
+ALB > Web 1, Web 2: "HTTP"
+Web 1, Web 2 > DB: "SQL"

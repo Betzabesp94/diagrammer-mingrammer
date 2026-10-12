@@ -1,0 +1,20 @@
+title: Red con subredes
+direction: LR
+
+Internet [icon: aws-internet-gateway]
+
+VPC [boundary: true] {
+  Publica [boundary: true] {
+    ALB [icon: aws-alb, label: "Balanceador"]
+    NAT [icon: aws-nat-gateway]
+  }
+  Privada [boundary: true] {
+    App1 [icon: aws-ec2, label: "App 1"]
+    App2 [icon: aws-ec2, label: "App 2"]
+  }
+}
+
+Internet > ALB: "HTTPS"
+ALB > App1, App2: "HTTP"
+App1, App2 > NAT: "salida"
+NAT > Internet: "HTTPS"

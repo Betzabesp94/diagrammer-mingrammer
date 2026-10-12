@@ -1,0 +1,13 @@
+title: Arquitectura con problemas
+entrypoint: Internet
+production: true
+
+Internet [icon: aws-users]
+Web [icon: aws-ec2]
+DB [icon: aws-rds, label: "Base de datos"]
+Batch [icon: aws-ec2, label: "Proceso batch"]
+Reportes [icon: aws-ec2]
+
+Internet > DB: "SQL directo"
+Web > DB: "SQL"
+Batch > Reportes: "genera"

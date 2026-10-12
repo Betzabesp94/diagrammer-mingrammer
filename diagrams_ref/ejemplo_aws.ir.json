@@ -1,0 +1,256 @@
+{
+  "schema_version": 2,
+  "title": "Aplicación web en AWS",
+  "slug": "ejemplo_aws",
+  "provider": "aws",
+  "direction": "LR",
+  "nodes": [
+    {
+      "id": "usuarios",
+      "var": "usuarios",
+      "label": "Usuarios",
+      "label_wrapped": "Usuarios",
+      "icon": "aws-users",
+      "diagrams_class": "diagrams.aws.general.Users",
+      "confidence": "exact",
+      "cluster": null,
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "dns",
+      "var": "dns",
+      "label": "Route 53",
+      "label_wrapped": "Route 53",
+      "icon": "aws-route53",
+      "diagrams_class": "diagrams.aws.network.Route53",
+      "confidence": "exact",
+      "cluster": null,
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "alb",
+      "var": "alb",
+      "label": "Balanceador de carga",
+      "label_wrapped": "Balanceador de\ncarga",
+      "icon": "aws-alb",
+      "diagrams_class": "diagrams.aws.network.ALB",
+      "confidence": "exact",
+      "cluster": "subred_publica",
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "web_1",
+      "var": "web_1",
+      "label": "Web 1",
+      "label_wrapped": "Web 1",
+      "icon": "aws-ec2",
+      "diagrams_class": "diagrams.aws.compute.EC2",
+      "confidence": "exact",
+      "cluster": "subred_de_aplicacion",
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "web_2",
+      "var": "web_2",
+      "label": "Web 2",
+      "label_wrapped": "Web 2",
+      "icon": "aws-ec2",
+      "diagrams_class": "diagrams.aws.compute.EC2",
+      "confidence": "exact",
+      "cluster": "subred_de_aplicacion",
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "db",
+      "var": "db",
+      "label": "Base de datos",
+      "label_wrapped": "Base de datos",
+      "icon": "aws-rds",
+      "diagrams_class": "diagrams.aws.database.RDS",
+      "confidence": "exact",
+      "cluster": "subred_de_datos",
+      "standalone": false,
+      "role": "service",
+      "tags": {
+        "multi_az": true
+      },
+      "extensions": {}
+    }
+  ],
+  "clusters": [
+    {
+      "id": "vpc",
+      "label": "VPC",
+      "parent": null,
+      "zone": 0,
+      "boundary": true,
+      "extensions": {}
+    },
+    {
+      "id": "subred_publica",
+      "label": "Subred pública",
+      "parent": "vpc",
+      "zone": 1,
+      "boundary": true,
+      "extensions": {}
+    },
+    {
+      "id": "subred_de_aplicacion",
+      "label": "Subred de aplicación",
+      "parent": "vpc",
+      "zone": 2,
+      "boundary": true,
+      "extensions": {}
+    },
+    {
+      "id": "subred_de_datos",
+      "label": "Subred de datos",
+      "parent": "vpc",
+      "zone": 3,
+      "boundary": true,
+      "extensions": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "usuarios",
+      "target": "dns",
+      "arrow": "forward",
+      "label": "consulta DNS",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e2",
+      "source": "usuarios",
+      "target": "alb",
+      "arrow": "forward",
+      "label": "HTTPS",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e3",
+      "source": "alb",
+      "target": "web_1",
+      "arrow": "forward",
+      "label": "HTTP",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e4",
+      "source": "alb",
+      "target": "web_2",
+      "arrow": "forward",
+      "label": "HTTP",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e5",
+      "source": "web_1",
+      "target": "db",
+      "arrow": "forward",
+      "label": "SQL",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e6",
+      "source": "web_2",
+      "target": "db",
+      "arrow": "forward",
+      "label": "SQL",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    }
+  ],
+  "constraints": {
+    "internet_entrypoint": "usuarios",
+    "production": true
+  },
+  "style_overrides": {},
+  "legend": {
+    "auto": true,
+    "entries": []
+  },
+  "unsupported": [],
+  "meta": {
+    "parser_version": 1,
+    "source": "ejemplo_aws.diag",
+    "resolver_version": 1,
+    "resolution": [
+      {
+        "node": "usuarios",
+        "source": "icon",
+        "status": "exact",
+        "token": "users",
+        "line": 8
+      },
+      {
+        "node": "dns",
+        "source": "icon",
+        "status": "exact",
+        "token": "route53",
+        "line": 9
+      },
+      {
+        "node": "alb",
+        "source": "icon",
+        "status": "exact",
+        "token": "alb",
+        "line": 13
+      },
+      {
+        "node": "web_1",
+        "source": "icon",
+        "status": "exact",
+        "token": "ec2",
+        "line": 16
+      },
+      {
+        "node": "web_2",
+        "source": "icon",
+        "status": "exact",
+        "token": "ec2",
+        "line": 17
+      },
+      {
+        "node": "db",
+        "source": "icon",
+        "status": "exact",
+        "token": "rds",
+        "line": 20
+      }
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+title: Seis hermanos
+G0 [boundary: true] {
+  N0a [icon: aws-ec2]
+  N0b [icon: aws-ec2]
+}
+N0a > N0b: "lee"
+G1 [boundary: true] {
+  N1a [icon: aws-ec2]
+  N1b [icon: aws-ec2]
+}
+N1a > N1b: "lee"
+G2 [boundary: true] {
+  N2a [icon: aws-ec2]
+  N2b [icon: aws-ec2]
+}
+N2a > N2b: "lee"
+G3 [boundary: true] {
+  N3a [icon: aws-ec2]
+  N3b [icon: aws-ec2]
+}
+N3a > N3b: "lee"
+G4 [boundary: true] {
+  N4a [icon: aws-ec2]
+  N4b [icon: aws-ec2]
+}
+N4a > N4b: "lee"
+G5 [boundary: true] {
+  N5a [icon: aws-ec2]
+  N5b [icon: aws-ec2]
+}
+N5a > N5b: "lee"

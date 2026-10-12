@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IR canónico v2 de diagrams-architect",
+  "description": "Contrato del IR canónico. Lo interpreta scripts/validate_ir.py (subconjunto: type, required, properties, additionalProperties, enum, pattern, items, minimum). Las reglas entre campos (ids únicos, referencias, ciclos) viven en el validador.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "title", "slug", "provider", "direction", "nodes", "clusters", "edges"],
+  "properties": {
+    "schema_version": { "enum": [2] },
+    "title": { "type": "string" },
+    "slug": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "provider": { "type": "string" },
+    "direction": { "enum": ["TB", "BT", "LR", "RL"] },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "var", "label", "label_wrapped", "diagrams_class", "confidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "var": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "label": { "type": "string" },
+          "label_wrapped": { "type": "string" },
+          "service": { "type": "string" },
+          "icon": { "type": "string" },
+          "diagrams_class": { "type": "string", "pattern": "^diagrams\\.([a-z0-9_]+\\.[a-z0-9_]+\\.[A-Za-z0-9_]+|Node)$" },
+          "confidence": { "enum": ["exact", "inferred", "generic", "custom", "ambiguous"] },
+          "cluster": { "type": ["string", "null"] },
+          "standalone": { "type": "boolean" },
+          "role": { "enum": ["service", "legend", "annotation"] },
+          "tags": { "type": "object" },
+          "extensions": { "type": "object" }
+        }
+      }
+    },
+    "clusters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "parent", "zone"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "label": { "type": "string" },
+          "parent": { "type": ["string", "null"] },
+          "zone": { "type": "integer", "minimum": 0 },
+          "boundary": { "type": "boolean" },
+          "role": { "enum": ["service", "legend"] },
+          "extensions": { "type": "object" }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "source", "target", "arrow"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "arrow": { "enum": ["forward", "both", "none"] },
+          "label": { "type": ["string", "null"] },
+          "type": { "enum": ["network", "event", "data", "invocation", "dependency", "authentication"] },
+          "emphasis": { "type": "boolean" },
+          "role": { "enum": ["flow", "legend"] },
+          "extensions": { "type": "object" }
+        }
+      }
+    },
+    "constraints": { "type": "object" },
+    "style_overrides": { "type": "object" },
+    "legend": { "type": "object" },
+    "unsupported": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["where", "feature"],
+        "properties": {
+          "where": { "type": "string" },
+          "feature": { "type": "string" },
+          "detail": { "type": "string" },
+          "severity": { "enum": ["INFO", "WARNING"] }
+        }
+      }
+    },
+    "meta": { "type": "object" }
+  }
+}

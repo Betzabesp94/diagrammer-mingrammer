@@ -1,0 +1,5 @@
+title: Label largo
+style.LABEL_WRAP: 40
+Web [icon: aws-ec2, label: "Servicio de orquestacion de pedidos mayoristas"]
+API [icon: aws-ec2]
+Web > API: "HTTPS"

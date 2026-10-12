@@ -14,6 +14,7 @@ Comandos:
   classes <provider>.<modulo>     -> clases Node reales en ese módulo (ej: aws.compute -> EC2, ECS, ...)
   check <ruta.de.Clase>           -> valida un path completo, ej: aws.compute.EC2 o diagrams.aws.compute.EC2
   search <keyword> [--providers a,b]  -> busca la keyword en todas las clases disponibles
+  resolve <token> [--provider aws]    -> resuelve un nombre de icono (ej: api-gateway) a UNA clase real
 
 Toda la salida es JSON por stdout, pensada para que la skill la parsee, no para
 que alguien la lea "a ojo". Un `check` o `search` sin resultados es la señal para
@@ -25,6 +26,7 @@ import argparse
 import importlib
 import json
 import pkgutil
+import re
 import sys
 from importlib.metadata import PackageNotFoundError, version as pkg_version
 
@@ -124,6 +126,75 @@ def search(keyword, providers=None):
     return results
 
 
+# Orden de preferencia entre módulos cuando un mismo nombre existe en varios
+# (ej. APIGateway está en aws.network y aws.mobile). Los módulos que no figuran
+# van después, en orden alfabético.
+MODULE_PRIORITY = [
+    "compute", "network", "database", "storage", "integration", "security", "ml",
+    "analytics", "management", "devtools", "iot", "media", "migration", "cost",
+    "mobile", "general",
+]
+
+
+def normalize_token(text):
+    """'API Gateway' / 'api-gateway' / 'APIGateway' -> 'apigateway'."""
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def build_index(providers=None):
+    """Índice {token_normalizado: [candidatos]} de las clases Node reales.
+
+    Cada candidato es {provider, module, name, cls}. Los alias del mismo objeto
+    (ElastiCache / Elasticache) quedan como candidatos con el mismo `cls`.
+    """
+    index = {}
+    for prov in providers or iter_provider_names():
+        for sub in iter_submodules(prov):
+            dotted = f"{prov}.{sub}"
+            try:
+                mod = importlib.import_module(f"diagrams.{dotted}")
+                names = iter_classes(dotted)
+            except Exception:
+                continue
+            for name in names:
+                index.setdefault(normalize_token(name), []).append(
+                    {"provider": prov, "module": sub, "name": name, "cls": getattr(mod, name)}
+                )
+    return index
+
+
+def _rank(cand):
+    mods = MODULE_PRIORITY
+    pos = mods.index(cand["module"]) if cand["module"] in mods else len(mods)
+    return (pos, cand["module"], cand["name"])
+
+
+def resolve_in(index, token):
+    """Resuelve un token contra un índice. Devuelve un dict determinista.
+
+    status: 'exact'     -> una sola clase real
+            'ambiguous' -> varias clases distintas; se elige la de mejor módulo
+                           y se listan las alternativas
+            'none'      -> ninguna coincidencia
+    """
+    cands = index.get(normalize_token(token), [])
+    if not cands:
+        return {"status": "none", "token": token}
+    by_cls = {}
+    for c in sorted(cands, key=_rank):
+        by_cls.setdefault(id(c["cls"]), c)
+    distinct = sorted(by_cls.values(), key=_rank)
+    best = distinct[0]
+    out = {
+        "status": "exact" if len(distinct) == 1 else "ambiguous",
+        "token": token,
+        "diagrams_class": f"diagrams.{best['provider']}.{best['module']}.{best['name']}",
+    }
+    if len(distinct) > 1:
+        out["alternatives"] = [f"diagrams.{c['provider']}.{c['module']}.{c['name']}" for c in distinct[1:]]
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -144,6 +215,10 @@ def main():
     p_search.add_argument("keyword")
     p_search.add_argument("--providers", help="lista separada por comas, ej: aws,gcp", default=None)
 
+    p_res = sub.add_parser("resolve")
+    p_res.add_argument("token", help="ej: api-gateway, ec2, 'API Gateway'")
+    p_res.add_argument("--provider", default=None, help="restringe a un proveedor, ej: aws")
+
     args = ap.parse_args()
 
     try:
@@ -160,6 +235,8 @@ def main():
         elif args.cmd == "search":
             provs = args.providers.split(",") if args.providers else None
             out = {"keyword": args.keyword, "matches": search(args.keyword, provs)}
+        elif args.cmd == "resolve":
+            out = resolve_in(build_index([args.provider] if args.provider else None), args.token)
         else:  # pragma: no cover
             ap.error("comando desconocido")
             return

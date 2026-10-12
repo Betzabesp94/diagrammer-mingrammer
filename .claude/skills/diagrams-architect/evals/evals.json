@@ -3,56 +3,68 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Necesito un diagrama para diagrams_src/ de una app web chica en AWS: un dominio con Route53, un load balancer, dos instancias EC2 dentro de una VPC, y una base de datos RDS Postgres detrás.",
-      "expected_output": "diagrams_src/<slug>.py con 5 nodos (Route53, ELB/ALB, 2x EC2, RDS), 1 cluster VPC, 5 edges (dns->lb, lb->web1, lb->web2, web1->db, web2->db), validate_diagram.py en PASS, reporte con mapeos 'exact'.",
+      "prompt": "Necesito un diagrama de una app web chica en AWS: un dominio con Route 53, un load balancer, dos instancias EC2 dentro de una VPC y una base de datos RDS. El tráfico entra por el balanceador y las instancias leen de la base.",
+      "expected_output": "Crea diagrams_src/<slug>.diag con 5 nodos (Route 53, ALB/ELB, 2 EC2, RDS), 1 grupo VPC y aristas balanceador→web1, balanceador→web2, web1→base, web2→base, todas con etiqueta específica (protocolo o verbo). `make diagram` termina en PASS o WARN sin ERROR, todos los iconos son `exact` y el reporte separa lo solicitado de lo inferido.",
       "files": []
     },
     {
       "id": 2,
-      "prompt": "Armá un diagrama de una VPC con dos subnets: una pública con un NAT gateway y un bastion EC2, y una privada con 3 instancias EC2 detrás de un ALB que está en la subnet pública.",
-      "expected_output": "Clusters anidados (VPC > subnet pública / subnet privada), nodos en el cluster correcto, sin conexiones directas de internet a la subnet privada.",
+      "prompt": "Arma un diagrama de una VPC con una subred pública (NAT Gateway y un bastion) y una subred privada (3 instancias EC2 detrás de un ALB). El ALB recibe tráfico de internet.",
+      "expected_output": "El .diag usa grupos anidados: VPC > subred pública / subred privada, con `boundary: true` en los tres. El IR tiene `parent` coherente, `CLU*` no reporta ERROR, y `entrypoint` queda declarado para activar las reglas de seguridad.",
       "files": []
     },
     {
       "id": 3,
-      "prompt": "Quiero ver la arquitectura: CloudFront adelante, pasando por un WAF, después un Application Load Balancer, que manda tráfico a un cluster de ECS, que lee y escribe en RDS.",
-      "expected_output": "5 nodos, 4 edges en cadena (cf->waf->alb->ecs->rds), sin warnings de seguridad (WAF está delante del ALB), fidelity PASS con --ir.",
+      "prompt": "Dibuja: CloudFront → WAF → ALB → ECS → RDS. Quiero ver las 4 conexiones y que se noten bien las etiquetas.",
+      "expected_output": "5 nodos y 4 aristas con etiqueta. validate_code en modo strict compara el código con el IR sin FID*; `validate_layout` no reporta LAY002 (etiqueta sobre un nodo).",
       "files": []
     },
     {
       "id": 4,
-      "prompt": "Necesito un diagrama serverless: API Gateway recibe requests y las manda a una función Lambda, que lee/escribe en una tabla DynamoDB.",
-      "expected_output": "3 nodos (APIGateway, Lambda, Dynamodb) resueltos como 'exact', 2 edges, sin Cluster (no se mencionó ningún boundary).",
+      "prompt": "Pasa a código esta arquitectura serverless: API Gateway invoca una Lambda que guarda en DynamoDB.",
+      "expected_output": "3 nodos con iconos `exact` (APIGateway, Lambda, Dynamodb), 2 aristas, sin grupos. No se agregan servicios que no se pidieron (CloudWatch, KMS, WAF).",
       "files": []
     },
     {
       "id": 5,
-      "prompt": "Dibujame un diagrama que use el nuevo servicio de IA generativa de AWS para agentes (todavía no sé si esta librería lo tiene con ícono propio), conectado a una Lambda que lo invoca.",
-      "expected_output": "La skill corre introspect_diagrams.py search antes de asumir nada; si no encuentra clase 1:1, degrada a generic.* o Custom y lo reporta explícitamente como tal, nunca inventa un import.",
+      "prompt": "Necesito un diagrama que incluya un servicio sin icono oficial en la librería diagrams (algo muy propietario, por ejemplo 'Motor de scoring interno').",
+      "expected_output": "El nodo usa el icono genérico y el reporte lista `RES003` (WARNING) con el nombre. No se inventa un import. El nodo aparece en `mapping.not_exact` con su motivo.",
       "files": []
     },
     {
       "id": 6,
-      "prompt": "Esta es una arquitectura de producción con alta disponibilidad: ALB -> 2 EC2 en distintas AZ -> RDS Postgres. Necesito el diagrama.",
-      "expected_output": "Genera el diagrama tal como se pidió (sin agregar componentes no pedidos) y el reporte incluye un WARNING de disponibilidad si el RDS no se marca multi-AZ, separado como recomendación, sin alterar la topología generada.",
+      "prompt": "Dibuja una arquitectura productiva y de alta disponibilidad con un ALB, dos EC2 y una base RDS. No marques la base como multi-AZ.",
+      "expected_output": "El .diag declara `production: true`. El reporte incluye `ARQ003` como WARNING y `ARQ004` como INFO, y la topología pedida NO cambia: la base no se vuelve multi-AZ por cuenta propia. Las recomendaciones van aparte y no se aplican.",
       "files": []
     },
     {
       "id": 7,
       "prompt": "Tengo esta arquitectura en Mermaid, pasámela a diagrams_src por favor:\n```mermaid\nflowchart LR\n  User --> APIGW[API Gateway]\n  APIGW --> Lambda\n  Lambda --> DDB[(DynamoDB)]\n```",
-      "expected_output": "Toma el Mermaid como especificación ya resuelta (no lo reinterpreta como prosa libre), mapea los 3 nodos relevantes a clases reales de diagrams y genera el .py con las mismas 2 conexiones (sin contar el nodo 'User' si no tiene ícono de proveedor aplicable, o mapeándolo a generic si corresponde).",
+      "expected_output": "El Mermaid se traduce directo a un .diag (3 nodos, 3 aristas) sin pedirle al usuario que lo reescriba en prosa. Las aristas sin etiqueta se completan con un verbo o protocolo razonable y se reporta como inferido, o se piden.",
       "files": []
     },
     {
       "id": 8,
-      "prompt": "Un balanceador recibe tráfico y lo manda a un grupo de servidores que escriben en una base de datos. No importa mucho el proveedor.",
-      "expected_output": "Ante la ambigüedad de proveedor, o bien usa diagrams.generic.* de forma consistente y lo reporta, o pregunta solo si es significativo — no debe mezclar proveedores sin avisar ni inventar un proveedor no mencionado.",
+      "prompt": "Dibuja un balanceador de carga con tres servidores detrás y una base de datos. No importa el proveedor.",
+      "expected_output": "Con proveedor no especificado, usa iconos de un mismo proveedor de forma consistente (o `generic`), o pregunta cuál. No mezcla proveedores sin avisar y deja la decisión anotada en el reporte.",
       "files": []
     },
     {
       "id": 9,
-      "prompt": "Quiero el mismo tipo de diagrama de siempre (CloudFront -> ALB -> ECS Fargate -> RDS, con un Secrets Manager para credenciales) pero con estética de pizarra colaborativa tipo Miro: tarjetas con ícono y descripción, flechas numeradas con badges, colores pastel por zona.",
-      "expected_output": "Usa el patrón design system (service_card/internal_card/flow/sticky_note de references/design_system.md, no el patrón clásico), sin agregar ni quitar componentes respecto de lo pedido, con fontname siempre Helvetica-Bold/Helvetica (nunca una fuente hand-drawn) y validate_diagram.py en PASS (incluida la dimensión typography).",
+      "prompt": "Quiero un diagrama estilo Miro con íconos de AWS para: usuarios → CloudFront → S3, y CloudFront → API Gateway → Lambda.",
+      "expected_output": "El estilo por defecto ya es el look tipo Miro (nodos nativos, zonas pastel, una sola fuente sans, flechas finas y neutras): no se usan tarjetas HTML. validate_code en modo strict no reporta STY*, el .py tiene el bloque STYLE y la fuente es Helvetica.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "Dame este diagrama con la sintaxis que ya tengo:\n```\nUsuarios [icon: aws-users]\nCDN [icon: aws-cloudfront, label: \"CloudFront\"]\nUsuarios > CDN: \"HTTPS\"\n```",
+      "expected_output": "Entrada con sintaxis tipo eraser: el parser la acepta tal cual, sin reescribirla; el resultado es PASS con iconos `exact`.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "El texto de los nodos se ve chico, ¿puedes subirlo a 14 y que las flechas sean más finas?",
+      "expected_output": "Se cambia solo el estilo, con directivas del .diag (`style.FONT_SIZE_NODE: 14`, `style.PENWIDTH_EDGE`) y se regenera con `make diagram`; no se edita el .py. La topología no cambia y el reporte sigue en PASS o WARN.",
       "files": []
     }
   ]

@@ -1,199 +1,152 @@
 #!/usr/bin/env python3
-"""Corre un set CHICO y determinístico de reglas de Solutions Architect sobre el
-modelo intermedio (IR) de una arquitectura, ANTES de traducirla a `diagrams`.
+"""Reglas pequeñas y deterministas de Solutions Architect sobre el IR canónico.
 
-No es un motor de Well-Architected: son cinco chequeos ilustrativos (networking,
-seguridad, disponibilidad, observabilidad, complejidad) pensados para atrapar lo
-obvio, no para auditar exhaustivamente. Ver references/architecture_rules.md.
+    .venv/bin/python scripts/validate_architecture.py <slug>.ir.json [--skip-isolated]
 
-Uso:
-    .venv/bin/python scripts/validate_architecture.py modelo_ir.json
+No es un motor de Well-Architected: son cuatro chequeos para atrapar lo obvio, no para auditar.
+Ninguno emite ERROR, así que nunca bloquea: los findings llegan al reporte tal cual y el
+usuario decide. Nunca se corrigen en silencio cambiando la topología pedida.
 
-El IR es el JSON que arma la skill internamente (ver references/ir_schema.md):
-{
-  "nodes": [{"id": "...", "service": "...", "diagrams_class": "...", "confidence": "exact|inferred|generic|custom|ambiguous", "tags": {...}}],
-  "clusters": [{"id": "...", "contains": ["node_id", ...]}],
-  "edges": [{"source": "...", "target": "...", "type": "network|event|data|invocation|dependency|authentication"}],
-  "constraints": {"production": false, "internet_entrypoint": "node_id", "notes": "..."}
-}
+  ARQ001 networking      nodos a los que no llega tráfico y no son el entrypoint
+  ARQ002 security        el entrypoint público conecta directo a una base de datos
+  ARQ003 availability    base de datos sin multi_az/multi_region en una arquitectura productiva
+  ARQ004 observability   arquitectura productiva sin logging ni monitoreo (INFO)
+  ARQ010 networking      no se declaró entrypoint: las reglas de red y seguridad no se pudieron aplicar (INFO)
 
-Salida: JSON con una lista `findings`, cada uno con severity (ERROR|WARNING|INFO),
-category, y message. Exit code 0 siempre (estas reglas nunca son bloqueantes por sí
-solas — ver la regla de "un WARNING nunca dispara una corrección silenciosa" en
-SKILL.md); es la skill la que decide qué hacer con cada finding, y SIEMPRE debe
-reportarlos tal cual, sin resolverlos por su cuenta.
+El tamaño del diagrama no está aquí: lo cubren SIZ001 y SIZ002 en validate_ir.py.
+`--skip-isolated` omite los nodos sin ninguna arista de ARQ001, porque validate_ir ya los reporta
+como CONN003 (lo usa el pipeline para no duplicar el hallazgo).
+
+Declara el entrypoint y el entorno en el .diag con `entrypoint: Nombre` y `production: true`.
 """
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
-DB_KEYWORDS = [
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import irlib  # noqa: E402
+
+DB_KEYWORDS = (
     "rds", "dynamodb", "aurora", "redshift", "elasticache", "documentdb", "neptune",
     "postgres", "mysql", "mongodb", "mariadb", "cosmosdb", "cloudsql", "bigtable",
-    "firestore", "memorystore", "spanner", "sqlserver", "cassandra", "database",
-]
-ENTRYPOINT_KEYWORDS = [
-    "elb", "alb", "nlb", "cloudfront", "apigateway", "route53", "loadbalancing",
-    "loadbalancer", "waf", "gateway", "frontdoor", "cdn", "ingress",
-]
-MONITORING_KEYWORDS = [
+    "firestore", "memorystore", "spanner", "sqlserver", "cassandra", ".database.",
+)
+MONITORING_KEYWORDS = (
     "cloudwatch", "cloudtrail", "xray", "prometheus", "grafana", "datadog",
     "newrelic", "stackdriver", "monitoring", "logging", "opsview", "splunk",
-]
-PRODUCTION_KEYWORDS = ["produccion", "producción", "production", "alta disponibilidad", "high availability", " ha ", "prod"]
-
-DEFAULT_MAX_NODES = 25
+)
+PRODUCTION_RE = re.compile(r"\b(producci[oó]n|production|alta disponibilidad|high availability|ha|prod)\b", re.IGNORECASE)
 
 
-def _lower_class(node):
-    return (node.get("diagrams_class") or node.get("service") or "").lower()
+def _text(node):
+    return f"{node.get('diagrams_class', '')} {node.get('service', '')}".lower()
 
 
-def _matches_any(text, keywords):
+def _matches(text, keywords):
     return any(k in text for k in keywords)
 
 
-def check_networking(ir):
-    findings = []
-    edges = ir.get("edges", [])
-    node_ids = {n["id"] for n in ir.get("nodes", [])}
-    entrypoint = ir.get("constraints", {}).get("internet_entrypoint")
-    incoming = {nid: 0 for nid in node_ids}
-    for e in edges:
-        if e.get("target") in incoming:
-            incoming[e["target"]] += 1
-    orphan_roots = [
-        nid for nid, count in incoming.items()
-        if count == 0 and nid != entrypoint and any(e.get("source") == nid for e in edges)
-    ]
-    if entrypoint and len(orphan_roots) >= 1:
-        findings.append({
-            "severity": "WARNING",
-            "category": "networking",
-            "message": (
-                f"Los nodos {orphan_roots} no reciben ninguna conexión entrante y no son el "
-                f"entry point declarado ({entrypoint}). Revisar si deberían quedar alcanzables "
-                "solo a través de un load balancer / API gateway / CDN, o si falta modelar cómo "
-                "reciben tráfico."
-            ),
-        })
-    return findings
+def is_production(ir):
+    constraints = ir.get("constraints") or {}
+    if constraints.get("production"):
+        return True
+    return bool(PRODUCTION_RE.search(str(constraints.get("notes", ""))))
 
 
-def check_security(ir):
-    findings = []
-    entrypoint = ir.get("constraints", {}).get("internet_entrypoint")
+def check_networking(ir, rep, skip_isolated):
+    entrypoint = (ir.get("constraints") or {}).get("internet_entrypoint")
     if not entrypoint:
-        return findings
-    nodes_by_id = {n["id"]: n for n in ir.get("nodes", [])}
-    for e in ir.get("edges", []):
-        if e.get("source") == entrypoint:
-            target = nodes_by_id.get(e.get("target"))
-            if target and _matches_any(_lower_class(target), DB_KEYWORDS):
-                findings.append({
-                    "severity": "WARNING",
-                    "category": "security",
-                    "message": (
-                        f"El entry point público ({entrypoint}) se conecta directo a "
-                        f"'{target.get('id')}' ({target.get('service')}), que parece una base de "
-                        "datos. Revisar si falta una capa de aplicación/API entre el tráfico "
-                        "público y el dato."
-                    ),
-                })
-    return findings
+        rep.add("ARQ010", "INFO", "architecture",
+                "no se declaró entrypoint: no se verificó la alcanzabilidad ni la exposición a internet",
+                hint="Agrega `entrypoint: <nodo>` al inicio del .diag.")
+        return False
+    nodes = irlib.flow_nodes(ir)
+    edges = irlib.flow_edges(ir)
+    incoming = {n["id"]: 0 for n in nodes}
+    outgoing = {n["id"]: 0 for n in nodes}
+    for e in edges:
+        if e["target"] in incoming:
+            incoming[e["target"]] += 1
+        if e["source"] in outgoing:
+            outgoing[e["source"]] += 1
+        if e.get("arrow") in ("both", "none"):
+            if e["source"] in incoming:
+                incoming[e["source"]] += 1
+            if e["target"] in outgoing:
+                outgoing[e["target"]] += 1
+    unreachable = []
+    for n in nodes:  # orden del IR: el mensaje no depende del hash de los ids
+        nid = n["id"]
+        if nid == entrypoint or n.get("standalone") or incoming[nid]:
+            continue
+        isolated = not outgoing[nid]
+        if isolated and skip_isolated:
+            continue
+        unreachable.append(nid)
+    if unreachable:
+        rep.add("ARQ001", "WARNING", "architecture",
+                f"a los nodos {unreachable} no llega ninguna conexión y no son el entrypoint ({entrypoint})",
+                subject=",".join(unreachable), found=unreachable,
+                hint="Revisa si deberían recibir tráfico a través de un balanceador, API gateway o CDN, o si falta modelarlo.")
+    return True
 
 
-def check_availability(ir):
-    findings = []
-    constraints = ir.get("constraints", {})
-    notes = " ".join(str(v) for v in constraints.values() if isinstance(v, str)).lower()
-    is_production = bool(constraints.get("production")) or _matches_any(notes, PRODUCTION_KEYWORDS)
-    if not is_production:
-        return findings
-    for node in ir.get("nodes", []):
-        if _matches_any(_lower_class(node), DB_KEYWORDS):
-            tags = node.get("tags", {}) or {}
+def check_security(ir, rep):
+    entrypoint = (ir.get("constraints") or {}).get("internet_entrypoint")
+    if not entrypoint:
+        return
+    by_id = {n["id"]: n for n in ir["nodes"]}
+    for e in irlib.flow_edges(ir):
+        if e["source"] == entrypoint and e["target"] in by_id and _matches(_text(by_id[e["target"]]), DB_KEYWORDS):
+            rep.add("ARQ002", "WARNING", "architecture",
+                    f"el entrypoint público ({entrypoint}) conecta directo a {e['target']!r}, que parece una base de datos",
+                    subject=e["target"],
+                    hint="Revisa si falta una capa de aplicación o API entre el tráfico público y el dato.")
+
+
+def check_availability(ir, rep):
+    if not is_production(ir):
+        return
+    for n in irlib.flow_nodes(ir):
+        if _matches(_text(n), DB_KEYWORDS):
+            tags = n.get("tags") or {}
             if not tags.get("multi_az") and not tags.get("multi_region"):
-                findings.append({
-                    "severity": "WARNING",
-                    "category": "availability",
-                    "message": (
-                        f"'{node.get('id')}' ({node.get('service')}) parece de base de datos y la "
-                        "arquitectura se describe como productiva/HA, pero no está marcada como "
-                        "multi-AZ. Confirmar si es Single-AZ intencional o si falta modelarlo."
-                    ),
-                })
-    return findings
+                rep.add("ARQ003", "WARNING", "architecture",
+                        f"{n['id']!r} parece una base de datos y la arquitectura es productiva, pero no está marcada multi_az",
+                        subject=n["id"], hint="Confirma si es Single-AZ a propósito o agrega `tag.multi_az: true`.")
 
 
-def check_observability(ir):
-    findings = []
-    constraints = ir.get("constraints", {})
-    notes = " ".join(str(v) for v in constraints.values() if isinstance(v, str)).lower()
-    is_production = bool(constraints.get("production")) or _matches_any(notes, PRODUCTION_KEYWORDS)
-    if not is_production:
-        return findings
-    has_monitoring = any(_matches_any(_lower_class(n), MONITORING_KEYWORDS) for n in ir.get("nodes", []))
-    if not has_monitoring:
-        findings.append({
-            "severity": "INFO",
-            "category": "observability",
-            "message": (
-                "La arquitectura se describe como productiva pero no se ve ningún componente de "
-                "logging/monitoreo (CloudWatch, Prometheus, Datadog...). Es solo una observación: "
-                "no agregar el componente de oficio, reportarlo como recomendación aparte."
-            ),
-        })
-    return findings
+def check_observability(ir, rep):
+    if is_production(ir) and not any(_matches(_text(n), MONITORING_KEYWORDS) for n in irlib.flow_nodes(ir)):
+        rep.add("ARQ004", "INFO", "architecture",
+                "arquitectura productiva sin componentes de logging ni monitoreo (CloudWatch, Prometheus, Datadog...)",
+                hint="Es una observación: no se agrega solo, va como recomendación aparte.")
 
 
-def check_complexity(ir, max_nodes):
-    findings = []
-    n = len(ir.get("nodes", []))
-    if n > max_nodes:
-        findings.append({
-            "severity": "INFO",
-            "category": "complexity",
-            "message": (
-                f"El diagrama tiene {n} nodos (> {max_nodes}), lo que puede dificultar la lectura. "
-                "Sugerir dividirlo en varios diagramas por dominio/capa; no dividirlo automáticamente."
-            ),
-        })
-    return findings
-
-
-def run_all(ir, max_nodes=DEFAULT_MAX_NODES):
-    findings = []
-    findings += check_networking(ir)
-    findings += check_security(ir)
-    findings += check_availability(ir)
-    findings += check_observability(ir)
-    findings += check_complexity(ir, max_nodes)
-    return findings
+def validate(ir, ir_path="", skip_isolated=False):
+    rep = irlib.Report("validate_architecture", target=ir_path, ir=ir_path)
+    check_networking(ir, rep, skip_isolated)
+    check_security(ir, rep)
+    check_availability(ir, rep)
+    check_observability(ir, rep)
+    return rep
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("ir_path", help="ruta al JSON del modelo intermedio")
-    ap.add_argument("--max-nodes", type=int, default=DEFAULT_MAX_NODES)
+    ap.add_argument("ir", help="IR canónico (.ir.json)")
+    ap.add_argument("--skip-isolated", action="store_true", help="no repetir los nodos sin aristas (los cubre CONN003)")
     args = ap.parse_args()
-
-    ir_path = Path(args.ir_path)
-    if not ir_path.exists():
-        print(json.dumps({"error": f"no existe {ir_path}"}))
-        sys.exit(1)
-
-    ir = json.loads(ir_path.read_text(encoding="utf-8"))
-    findings = run_all(ir, args.max_nodes)
-    counts = {"ERROR": 0, "WARNING": 0, "INFO": 0}
-    for f in findings:
-        counts[f["severity"]] += 1
-
-    print(json.dumps({"findings": findings, "counts": counts}, indent=2, ensure_ascii=False))
-    sys.exit(0)
+    try:
+        ir = irlib.load_ir(args.ir)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(json.dumps({"error": f"no se pudo leer {args.ir}: {exc}"}))
+        return 2
+    return validate(ir, args.ir, args.skip_isolated).emit()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -1,0 +1,20 @@
+title: Web app en AWS
+direction: LR
+
+Usuarios [icon: aws-users, label: "Usuarios"]
+
+VPC [boundary: true] {
+  Web [icon: aws-ec2, label: "Servidor web"]
+  API [icon: aws-ec2]
+  Datos {
+    DB [icon: aws-rds, label: "Base de datos"]
+    Cache [icon: aws-elasticache]
+  }
+}
+
+// conexiones
+Usuarios > Web: "HTTPS"
+Web > API, Cache: "invoca"
+API <> DB: "SQL"
+Cache < API
+Web - Usuarios

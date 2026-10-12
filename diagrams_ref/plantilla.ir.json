@@ -1,0 +1,152 @@
+{
+  "schema_version": 2,
+  "title": "Mi arquitectura",
+  "slug": "plantilla",
+  "provider": "aws",
+  "direction": "LR",
+  "nodes": [
+    {
+      "id": "usuarios",
+      "var": "usuarios",
+      "label": "Usuarios",
+      "label_wrapped": "Usuarios",
+      "icon": "aws-users",
+      "diagrams_class": "diagrams.aws.general.Users",
+      "confidence": "exact",
+      "cluster": null,
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "balanceador",
+      "var": "balanceador",
+      "label": "Balanceador",
+      "label_wrapped": "Balanceador",
+      "icon": "aws-elb",
+      "diagrams_class": "diagrams.aws.network.ELB",
+      "confidence": "exact",
+      "cluster": "vpc",
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "servidor",
+      "var": "servidor",
+      "label": "Servidor",
+      "label_wrapped": "Servidor",
+      "icon": "aws-ec2",
+      "diagrams_class": "diagrams.aws.compute.EC2",
+      "confidence": "exact",
+      "cluster": "vpc",
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "almacen",
+      "var": "almacen",
+      "label": "Bucket de archivos",
+      "label_wrapped": "Bucket de\narchivos",
+      "icon": "aws-s3",
+      "diagrams_class": "diagrams.aws.storage.S3",
+      "confidence": "exact",
+      "cluster": null,
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    }
+  ],
+  "clusters": [
+    {
+      "id": "vpc",
+      "label": "VPC",
+      "parent": null,
+      "zone": 0,
+      "boundary": true,
+      "extensions": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "usuarios",
+      "target": "balanceador",
+      "arrow": "forward",
+      "label": "HTTPS",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e2",
+      "source": "balanceador",
+      "target": "servidor",
+      "arrow": "forward",
+      "label": "HTTP",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e3",
+      "source": "servidor",
+      "target": "almacen",
+      "arrow": "forward",
+      "label": "lee y escribe",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    }
+  ],
+  "constraints": {},
+  "style_overrides": {},
+  "legend": {
+    "auto": true,
+    "entries": []
+  },
+  "unsupported": [],
+  "meta": {
+    "parser_version": 1,
+    "source": "plantilla.diag",
+    "resolver_version": 1,
+    "resolution": [
+      {
+        "node": "usuarios",
+        "source": "icon",
+        "status": "exact",
+        "token": "users",
+        "line": 15
+      },
+      {
+        "node": "balanceador",
+        "source": "icon",
+        "status": "exact",
+        "token": "elb",
+        "line": 19
+      },
+      {
+        "node": "servidor",
+        "source": "icon",
+        "status": "exact",
+        "token": "ec2",
+        "line": 20
+      },
+      {
+        "node": "almacen",
+        "source": "icon",
+        "status": "exact",
+        "token": "s3",
+        "line": 23
+      }
+    ]
+  }
+}

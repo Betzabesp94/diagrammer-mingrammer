@@ -1,0 +1,199 @@
+{
+  "skill_name": "diagrams-architect",
+  "description": "Evals verificables por script. Cada caso corre el pipeline sobre un .diag y compara ids de finding ('etapa:ID'), sin juzgar prosa. Los consume tests/test_pipeline_evals.py (make evals).",
+  "cases": [
+    {
+      "id": "G1a",
+      "title": "Sintaxis tipo eraser completa: grupos anidados, los cuatro operadores, fan-out y etiquetas",
+      "input": "tests/fixtures/ok_small.diag",
+      "expect": {
+        "overall": "PASS",
+        "stages": {
+          "validate_ir": "PASS",
+          "validate_code": "PASS",
+          "validate_layout": "PASS",
+          "check_determinism": "PASS"
+        }
+      }
+    },
+    {
+      "id": "G1c",
+      "title": "Leyenda automática cuando hay trazos con significado",
+      "input": "tests/fixtures/ok_legend.diag",
+      "expect": {
+        "overall": "PASS",
+        "py_contains": [
+          "LEGEND_NODE",
+          "link(\"event\""
+        ]
+      }
+    },
+    {
+      "id": "G1b",
+      "title": "Subredes anidadas con iconos oficiales de AWS",
+      "input": "tests/fixtures/ok_nested.diag",
+      "expect": {
+        "overall": "PASS",
+        "exclude": [
+          "parse_dsl:PAR001"
+        ],
+        "mapping_not_generic": true
+      }
+    },
+    {
+      "id": "G2",
+      "title": "Nodo huérfano",
+      "input": "tests/fixtures/bad_orphan.diag",
+      "expect": {
+        "overall": "WARN",
+        "include": [
+          "validate_ir:CONN003"
+        ]
+      }
+    },
+    {
+      "id": "G3",
+      "title": "Label largo que desborda su nodo (estimado y medido)",
+      "input": "tests/fixtures/bad_long_label.diag",
+      "expect": {
+        "overall": "WARN",
+        "include": [
+          "validate_ir:TXT001",
+          "validate_layout:LAY003"
+        ]
+      }
+    },
+    {
+      "id": "G4",
+      "title": "Cluster de un solo nodo que no es un límite real",
+      "input": "tests/fixtures/bad_single_node_cluster.diag",
+      "expect": {
+        "overall": "WARN",
+        "include": [
+          "validate_ir:CLU002"
+        ]
+      }
+    },
+    {
+      "id": "G5",
+      "title": "Diagrama grande: más de 20 nodos, más de 25 aristas y lienzo ilegible",
+      "input": "tests/fixtures/bad_big.diag",
+      "expect": {
+        "overall": "WARN",
+        "include": [
+          "validate_ir:SIZ001",
+          "validate_ir:SIZ002",
+          "validate_layout:LAY008"
+        ]
+      }
+    },
+    {
+      "id": "G6a",
+      "title": "Doble render idéntico",
+      "input": "tests/fixtures/ok_nested.diag",
+      "expect": {
+        "overall": "PASS",
+        "stages": {
+          "check_determinism": "PASS"
+        },
+        "exclude": [
+          "check_determinism:DET001",
+          "check_determinism:DET002"
+        ]
+      }
+    },
+    {
+      "id": "G6b",
+      "title": "Un .py editado a mano se detecta",
+      "input": "tests/fixtures/ok_small.diag",
+      "after": {
+        "mutate": "append_comment",
+        "run": [
+          "check_determinism"
+        ]
+      },
+      "expect": {
+        "include": [
+          "check_determinism:DET001"
+        ]
+      }
+    },
+    {
+      "id": "G7a",
+      "title": "Flecha con etiqueta en splines=ortho: el generador usa xlabel",
+      "input": "tests/fixtures/bad_ortho_label.diag",
+      "expect": {
+        "overall": "PASS",
+        "py_contains": [
+          "xlabel="
+        ],
+        "py_not_contains": [
+          "link(label="
+        ]
+      }
+    },
+    {
+      "id": "G7b",
+      "title": "Si alguien reintroduce label= con ortho, se detecta en el código y en el layout",
+      "input": "tests/fixtures/bad_ortho_label.diag",
+      "after": {
+        "mutate": "ortho_label_kwarg",
+        "run": [
+          "validate_code",
+          "validate_layout"
+        ]
+      },
+      "expect": {
+        "include": [
+          "validate_code:STY010",
+          "validate_layout:LAY010"
+        ]
+      }
+    },
+    {
+      "id": "G8",
+      "title": "Arquitectura con problemas: entrypoint a la base de datos, sin multi-AZ y sin monitoreo (no bloquea)",
+      "input": "tests/fixtures/bad_architecture.diag",
+      "expect": {
+        "overall": "WARN",
+        "include": [
+          "validate_architecture:ARQ001",
+          "validate_architecture:ARQ002",
+          "validate_architecture:ARQ003",
+          "validate_architecture:ARQ004"
+        ],
+        "stages": {
+          "validate_architecture": "WARN",
+          "validate_code": "PASS"
+        }
+      }
+    },
+    {
+      "id": "X1",
+      "title": "Seis clusters hermanos exceden la paleta: se detiene antes de generar",
+      "input": "tests/fixtures/bad_six_siblings.diag",
+      "expect": {
+        "overall": "FAIL",
+        "include": [
+          "validate_ir:CLU006"
+        ],
+        "no_py": true
+      }
+    },
+    {
+      "id": "X2",
+      "title": "Error de sintaxis con línea:columna",
+      "input": "tests/fixtures/bad_syntax.diag",
+      "expect": {
+        "overall": "FAIL",
+        "include": [
+          "parse_dsl:PAR001"
+        ],
+        "where_prefix": {
+          "parse_dsl:PAR001": "4:"
+        },
+        "no_py": true
+      }
+    }
+  ]
+}
