@@ -45,7 +45,7 @@ winget install Graphviz.Graphviz
 ```
 
 En Windows, si después de instalar `dot` no se encuentra, agrega a mano
-`C:\Program Files\Graphviz\bin` al `PATH` y abrí una terminal nueva.
+`C:\Program Files\Graphviz\bin` al `PATH` y abre una terminal nueva.
 
 Verifica que quedó bien:
 
