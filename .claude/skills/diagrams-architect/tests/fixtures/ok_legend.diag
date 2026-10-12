@@ -1,0 +1,20 @@
+title: Pedidos con eventos
+direction: LR
+entrypoint: Cliente
+production: true
+
+Cliente [icon: aws-users]
+Sistema {
+  API [icon: aws-apigateway, label: "API de pedidos"]
+  Pedidos [icon: aws-lambda, label: "Procesar pedido"]
+  Cola [icon: aws-sqs, label: "Cola de pedidos"]
+  Tabla [icon: aws-dynamodb, label: "Tabla de pedidos", tag.multi_az: true]
+  Usuarios [icon: aws-cognito, label: "Autenticación"]
+}
+
+Cliente > API: "HTTPS" [emphasis: true]
+API > Usuarios: "valida token" [type: authentication]
+API > Pedidos: "invoca"
+Pedidos > Cola: "publica evento" [type: event]
+Pedidos > Tabla: "escribe"
+Cola > Pedidos: "reintenta" [type: dependency]

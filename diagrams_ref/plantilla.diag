@@ -1,0 +1,32 @@
+// Plantilla: copia este archivo a diagrams_src/mi_diagrama.diag y edítalo.
+// Compílalo con:  make diagram IN=diagrams_src/mi_diagrama.diag
+// Referencia completa de la sintaxis: .claude/skills/diagrams-architect/references/dsl.md
+
+// --- Directivas (todas opcionales, al inicio) ---
+title: Mi arquitectura
+direction: LR                 // LR | RL | TB | BT
+// splines: spline            // spline | ortho | polyline | curved | line
+// legend: off                // la leyenda se genera sola si hay flechas con significado
+// entrypoint: Usuarios       // nodo expuesto a internet (activa las reglas de seguridad)
+// production: true           // activa las reglas de alta disponibilidad
+// style.FONT_SIZE_NODE: 13   // cualquier variable del bloque STYLE
+
+// --- Nodos: Nombre [icon: <proveedor>-<servicio>, label: "Texto"] ---
+Usuarios [icon: aws-users]
+
+// --- Grupos (se anidan; boundary marca un límite real: VPC, subred, namespace) ---
+VPC [boundary: true] {
+  Balanceador [icon: aws-elb]
+  Servidor [icon: aws-ec2]
+}
+
+Almacén [icon: aws-s3, label: "Bucket de archivos"]
+
+// --- Conexiones: una por línea ---
+//   A > B       A llama a B          A < B       B llama a A
+//   A <> B      en ambos sentidos    A - B       sin flecha
+//   A > B, C    una arista a cada destino (también  A, B > C)
+//   A > B: "HTTPS"   etiqueta; usa un verbo o un protocolo, nunca "usa" ni "conecta"
+Usuarios > Balanceador: "HTTPS"
+Balanceador > Servidor: "HTTP"
+Servidor > Almacén: "lee y escribe"

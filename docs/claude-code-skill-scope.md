@@ -1,7 +1,8 @@
 # Referencia para una futura Skill de Claude Code: "generar diagramas con `diagrams`"
 
-> **Estado: documento de investigación y alcance. La skill NO está creada.**
-> Este archivo es el insumo para correr `skill-creator` más adelante — no reemplaza ese paso.
+> **Estado: documento histórico.** Es la investigación y el alcance previos a la skill, que ya existe en
+> `.claude/skills/diagrams-architect/`. Para el diseño vigente (DSL `.diag`, IR v2, generador determinista
+> y validadores) consulta `SKILL.md` y `references/`; este texto puede describir decisiones ya superadas.
 
 ## 1. Objetivo de la skill (propuesta)
 
@@ -91,7 +92,7 @@ desaparecen" sin imponerle al usuario ninguna sintaxis nueva.
 
 **Atajos opcionales aceptados, no promovidos como flujo principal:**
 - Si el usuario ya escribió una lista tipo Eraser o un diagrama Mermaid existente y pide
-  "pasame esto a `diagrams`", la skill debe poder tomarlo como especificación estructurada y
+  "pasa esto a `diagrams`", la skill debe poder tomarlo como especificación estructurada y
   volcarlo directamente al modelo intermedio (mejor entrada que prosa, mismo destino).
 - No se debe instruir al usuario a preferir ese camino: agrega fricción sin mejorar el resultado
   para el caso común.

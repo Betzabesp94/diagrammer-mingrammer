@@ -1,0 +1,212 @@
+{
+  "schema_version": 2,
+  "title": "Web app en AWS",
+  "slug": "ok_small",
+  "provider": "aws",
+  "direction": "LR",
+  "nodes": [
+    {
+      "id": "usuarios",
+      "var": "usuarios",
+      "label": "Usuarios",
+      "label_wrapped": "Usuarios",
+      "icon": "aws-users",
+      "diagrams_class": "diagrams.aws.general.Users",
+      "confidence": "exact",
+      "cluster": null,
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "web",
+      "var": "web",
+      "label": "Servidor web",
+      "label_wrapped": "Servidor web",
+      "icon": "aws-ec2",
+      "diagrams_class": "diagrams.aws.compute.EC2",
+      "confidence": "exact",
+      "cluster": "vpc",
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "api",
+      "var": "api",
+      "label": "API",
+      "label_wrapped": "API",
+      "icon": "aws-ec2",
+      "diagrams_class": "diagrams.aws.compute.EC2",
+      "confidence": "exact",
+      "cluster": "vpc",
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "db",
+      "var": "db",
+      "label": "Base de datos",
+      "label_wrapped": "Base de datos",
+      "icon": "aws-rds",
+      "diagrams_class": "diagrams.aws.database.RDS",
+      "confidence": "exact",
+      "cluster": "datos",
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    },
+    {
+      "id": "cache",
+      "var": "cache",
+      "label": "Cache",
+      "label_wrapped": "Cache",
+      "icon": "aws-elasticache",
+      "diagrams_class": "diagrams.aws.database.ElastiCache",
+      "confidence": "exact",
+      "cluster": "datos",
+      "standalone": false,
+      "role": "service",
+      "tags": {},
+      "extensions": {}
+    }
+  ],
+  "clusters": [
+    {
+      "id": "vpc",
+      "label": "VPC",
+      "parent": null,
+      "zone": 0,
+      "boundary": true,
+      "extensions": {}
+    },
+    {
+      "id": "datos",
+      "label": "Datos",
+      "parent": "vpc",
+      "zone": 1,
+      "boundary": false,
+      "extensions": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "usuarios",
+      "target": "web",
+      "arrow": "forward",
+      "label": "HTTPS",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e2",
+      "source": "web",
+      "target": "api",
+      "arrow": "forward",
+      "label": "invoca",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e3",
+      "source": "web",
+      "target": "cache",
+      "arrow": "forward",
+      "label": "invoca",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e4",
+      "source": "api",
+      "target": "db",
+      "arrow": "both",
+      "label": "SQL",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e5",
+      "source": "api",
+      "target": "cache",
+      "arrow": "forward",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    },
+    {
+      "id": "e6",
+      "source": "web",
+      "target": "usuarios",
+      "arrow": "none",
+      "type": "network",
+      "emphasis": false,
+      "role": "flow",
+      "extensions": {}
+    }
+  ],
+  "constraints": {},
+  "style_overrides": {},
+  "legend": {
+    "auto": true,
+    "entries": []
+  },
+  "unsupported": [],
+  "meta": {
+    "parser_version": 1,
+    "source": "ok_small.diag",
+    "resolver_version": 1,
+    "resolution": [
+      {
+        "node": "usuarios",
+        "source": "icon",
+        "status": "exact",
+        "token": "users",
+        "line": 4
+      },
+      {
+        "node": "web",
+        "source": "icon",
+        "status": "exact",
+        "token": "ec2",
+        "line": 7
+      },
+      {
+        "node": "api",
+        "source": "icon",
+        "status": "exact",
+        "token": "ec2",
+        "line": 8
+      },
+      {
+        "node": "db",
+        "source": "icon",
+        "status": "exact",
+        "token": "rds",
+        "line": 10
+      },
+      {
+        "node": "cache",
+        "source": "icon",
+        "status": "exact",
+        "token": "elasticache",
+        "line": 11
+      }
+    ]
+  }
+}

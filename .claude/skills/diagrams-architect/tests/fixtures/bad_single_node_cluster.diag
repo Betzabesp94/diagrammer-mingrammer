@@ -1,0 +1,6 @@
+title: Cluster de un nodo
+Capa [icon: aws-ec2] 
+Solitario {
+  Unico [icon: aws-rds]
+}
+Capa > Unico: "SQL"

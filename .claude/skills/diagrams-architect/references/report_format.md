@@ -1,56 +1,37 @@
-# Formato del reporte final
+# Reporte final
 
-El reporte es tan parte del output como el `.py` — es lo que convierte esto de
-"Claude escribe Python" a "Claude genera y valida un artefacto arquitectónico
-versionable". Usá esta estructura siempre, adaptando el contenido pero no las
-secciones (omití una sección solo si genuinamente no aplica, ej. no hubo
-recomendaciones):
+`make diagram` deja `output/<slug>.report.json`. Es lo que demuestra que la arquitectura fue
+validada y no solo escrita. Léelo y responde al usuario con las tres secciones de abajo.
+
+## Campos del JSON
+
+| Campo | Contenido |
+|---|---|
+| `overall` | `PASS`, `WARN` o `FAIL` |
+| `counts` | `error`, `warning`, `info` |
+| `env` | versiones de `python`, `diagrams` y `graphviz_dot`: cítalas en el reporte |
+| `stages` | resultado por etapa (`validate_ir`, `validate_architecture`, `validate_code`, `validate_layout`, `check_determinism`) |
+| `findings[]` | `id`, `severity`, `stage`, `message`, y si aplica `where`, `subject`, `hint` |
+| `mapping` | `by_confidence` y `not_exact`: los nodos cuyo icono no es `exact` |
+| `artifacts` | rutas del `.diag`, el `.ir.json`, el `.py` y el `.png` |
+
+## Cómo presentarlo
 
 ```
-Generated:
-  diagrams_src/<slug>.py
+Generado:  diagrams_src/<slug>.py  (desde <slug>.diag)
+Render:    output/<slug>.png   | o: Graphviz no está instalado (brew install graphviz); el .py está validado
+Entorno:   diagrams <versión> · Graphviz <versión> · Python <versión>
+Resultado: PASS | WARN | FAIL   (errores N · avisos N · info N)
 
-Rendered:
-  output/<slug>.png            (o: "no renderizado — Graphviz no está instalado, ver `make check`")
-
-Validation
-──────────
-Syntax                    PASS
-diagrams imports          PASS
-Diagram context           PASS
-Repo conventions          PASS
-Topology fidelity         PASS   (expected: 6 nodes / 6 edges / 1 cluster — generated: igual)
-Architecture consistency  WARNING (1)
-
-Architecture warnings
-──────────────────────
-[W001] RDS está representado como Single-AZ; el pedido mencionó "producción".
-
-Icon mapping
-────────────
-5 exact
-1 inferred  (mapeo por rol descrito, no por nombre de servicio — confirmar)
-1 generic   (no hay ícono oficial para el servicio descrito)
-0 custom
-
-Recommendations (not applied)
-──────────────────────────────
-- Considerar agregar WAF delante del ALB público.
-- Considerar Multi-AZ para la instancia RDS de producción.
+Solicitado     lo que se dibujó tal como se pidió
+Inferido       cada nodo con mapping.not_exact (clase y motivo), y todo componente que agregaste sin que se pidiera
+Recomendaciones  findings ARQ* y cualquier sugerencia de arquitectura; aparte y sin aplicar al diagrama
 ```
 
 ## Reglas de contenido
 
-- **Errors bloquean, warnings no.** Si `validate_diagram.py` devuelve
-  `overall: FAIL`, el resultado NO se presenta como exitoso — se corrige (o, si no
-  se puede resolver sin inventar algo, se reporta el bloqueo explícitamente) antes
-  de ofrecer el `.py` como terminado. Los warnings e infos de
-  `validate_architecture.py` se reportan siempre, nunca bloquean.
-- **Mapeos con confianza `inferred`/`generic`/`custom`/`ambiguous` siempre se
-  listan**, no solo se cuentan — decí qué nodo y por qué.
-- **Recomendaciones van aparte, nunca mezcladas con lo solicitado.** Si agregaste
-  algo al `.py` que el usuario no pidió explícitamente (ej. un `Cluster` VPC
-  implícito), decilo en el cuerpo de la respuesta, no lo escondas.
-- Si no se pudo renderizar (Graphviz ausente), decilo en `Rendered:` con la
-  instrucción de `make check` — nunca falles el resultado completo por eso ni
-  intentes instalar Graphviz.
+- Un ERROR bloquea: no lo reportes como éxito con una advertencia. Corrige el `.diag` y repite.
+- Los WARNING se reportan siempre, con su id. No los resuelvas cambiando la topología pedida.
+- Los mapeos que no son `exact` se listan uno por uno con su motivo, no solo se cuentan.
+- Si falta Graphviz, no falla el resultado: indica "Render: no ejecutado" y la instrucción de instalación.
+- Mira el PNG como control final: ¿se parece razonablemente a lo pedido?

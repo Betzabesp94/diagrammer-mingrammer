@@ -1,118 +1,48 @@
-# Convenciones de este repo (diagrammer-mingrammer)
+# Convenciones del repo
 
-Confirmadas leyendo `diagrams_ref/plantilla.py`, `diagrams_ref/ejemplo_aws.py`,
-`Makefile` y `render.sh` — no asumidas de memoria. Si esos archivos cambian en el
-futuro, estas notas pueden quedar desactualizadas; en caso de duda, releelos.
+Las aplica el generador; este archivo explica qué esperar y cómo trabajar con los archivos.
 
-## Anatomía de `diagrams_src/<slug>.py`
+## Carpetas
 
-```python
-import os
-from pathlib import Path
+| Carpeta | Contenido | Git |
+|---|---|---|
+| `diagrams_ref/` | referencias: `plantilla.diag` y `ejemplo_aws.diag` con su `.ir.json` y su `.py` generados | versionada |
+| `diagrams_src/` | tus diagramas: `<slug>.diag` (lo que editas), `<slug>.ir.json` y `<slug>.py` (generados) | ignorada |
+| `output/` | `<slug>.png`/`.svg`/`.dot` y `<slug>.report.json` | ignorada |
 
-from diagrams import Cluster, Diagram
-from diagrams.aws.compute import EC2
-from diagrams.aws.network import ELB
+Nunca agregues a git nada de `diagrams_src/`. No edites los `.py` ni los `.ir.json`: cambia el `.diag`.
 
-OUT = Path(__file__).resolve().parent.parent / "output" / "<slug>"
-FMT = os.getenv("FORMAT", "png")
+## Anatomía del `.py` generado
 
-with Diagram(
-    "Título legible",
-    filename=str(OUT),
-    outformat=FMT,
-    show=False,
-    direction="LR",  # o TB/RL/BT
-):
-    lb = ELB("entrada")
-    with Cluster("VPC"):
-        app = EC2("app")
-    lb >> app
-```
+Orden fijo: docstring → imports → `# === OUTPUT ===` (`OUT`, `FMT`) → `# === STYLE ===` →
+helpers `zone()` y `link()` → `with Diagram(...)` → nodos sin cluster → clusters (en profundidad) →
+aristas. Convenciones que validan `validate_code.py` y `check_determinism.py`:
 
-Puntos que `scripts/validate_diagram.py` chequea automáticamente, no hace falta
-revisarlos a mano:
+- `OUT = Path(__file__).resolve().parent.parent / "output" / "<slug>"`, independiente del directorio de trabajo.
+- `FMT = os.getenv("FORMAT", "png")`; el render usa `filename=str(OUT)` y `outformat=FMT`.
+- `show=False`.
+- Cada nodo lleva `nodeid="<id del IR>"`: así el SVG y el layout usan los ids del IR y no un uuid.
+- Variables con nombre de rol (`api_gw`, `orders_db`), no `node1`.
+- Sin timestamps ni versiones dentro del archivo: van en `env` del reporte.
 
-- `OUT` resuelto vía `Path(__file__).resolve().parent.parent / "output" / "<slug>"`
-  (nunca una ruta relativa fija — así el script produce el mismo resultado sin
-  importar desde qué directorio se lo ejecute).
-- `FMT = os.getenv("FORMAT", "png")`.
-- `show=False` en el `Diagram(...)` (siempre, en código versionado).
-- `filename=str(OUT)` y `outformat=FMT`.
-- Todo nodo (`EC2(...)`, `RDS(...)`, etc.) creado dentro del `with Diagram(...):`
-  activo — si no, `diagrams` lanza `EnvironmentError` en runtime.
-
-## Nombre de archivo = nombre del diagrama
-
-Un diagrama por archivo. El slug (`<slug>.py`) es el mismo nombre que usa `OUT`
-para la imagen en `output/`. Elegí un slug en `kebab_case` o `snake_case` corto y
-descriptivo del sistema, no del tipo de nodo (`customer-platform`, no
-`aws_diagram_1`).
-
-## Nombrá variables por el rol, no por el tipo de nodo
-
-`web`, `db`, `cola_eventos` — no `ec2_1`, `n2`. El `.py` es la documentación de la
-arquitectura, tiene que leerse como tal.
-
-## `Cluster` es para límites reales
-
-VPC, subnet, namespace de k8s, dominio de negocio — no para "que quede prolijo".
-Anidar clusters sin que exista ese límite real hace que el diagrama mienta sobre
-la infra real.
-
-## Estilo de `Edge`
-
-Etiquetar una `Edge` (label/color/style) solo cuando la flecha no se explica sola:
-protocolo, sincronía (`style="dashed"` para async) o criticidad
-(`color="firebrick"` para una ruta crítica). No decorar cada conexión sin razón.
-
-## Tipografía: siempre Helvetica-Bold, nunca fuentes "hand-drawn"
-
-El `fontname` de `graph_attr`/`node_attr`/`edge_attr` es **siempre
-`Helvetica-Bold`** por defecto — es la fuente que ya usan `plantilla.py` y
-`ejemplo_aws.py`, y está confirmada instalada en el entorno del equipo. Si
-`Helvetica-Bold` no estuviera disponible en el entorno donde se renderiza, el
-fallback es, en este orden: **`Arial`**, después **`Times-Roman`**.
-
-**No uses `Bradley Hand` ni ninguna otra fuente "hand-drawn"/informal**, aunque
-el pedido describa una estética tipo pizarra/Miro/sketchnote. Ese tipo de
-fuentes suele ser una fuente del sistema operativo local (no del paquete
-`diagrams` ni de Graphviz): puede estar instalada en la máquina donde se
-generó el diagrama y faltar en la de otra persona o en CI, y Graphviz no
-avisa cuando eso pasa — simplemente sustituye por un sans-serif genérico en
-silencio, así que el resultado deja de ser reproducible entre máquinas sin que
-nadie lo note. Esto aplica igual dentro de un label HTML del design system
-(`FACE="..."`, ver `references/design_system.md`), no solo a `fontname=...`.
-La estética "pizarra colaborativa" (colores pastel, clusters redondeados,
-cards con ícono+descripción, sticky notes) se logra igual sin tocar la
-tipografía — ver `references/design_system.md` para el patrón completo.
-
-## `direction`
-
-`LR` para flujos de request/pipeline (entra por un lado, sale por el otro), `TB`
-para arquitecturas en capas (presentación/aplicación/datos apiladas). Elegilo
-según el tipo de arquitectura, no por default.
-
-## Comandos del repo
+## Comandos
 
 ```bash
-make check                       # verifica python + graphviz + diagrams — nunca instalar nada si falta
-make render FILE=<slug>.py       # -> output/<slug>.png
-make render FILE=<slug>.py FMT=svg
-./render.sh <slug>               # equivalente sin make
+make diagram IN=diagrams_src/<slug>.diag   # valida, genera, renderiza, mide y deja el reporte
+make validate FILE=diagrams_src/<slug>.py  # valida un .py (estricto si lo generó la skill)
+make render FILE=<slug>.py [FMT=svg]       # solo renderizar
+make all                                   # renderiza todos los .py de diagrams_ref/ y diagrams_src/
+make test                                  # pruebas de la skill
+make evals                                 # evals verificables por script
 ```
 
-`render.sh` ya maneja la resolución del intérprete (usa `.venv/bin/python` si
-existe) y valida que `dot` (Graphviz) y `diagrams` estén disponibles antes de
-intentar renderizar — no reimplementes ese chequeo, usalo.
+## Archivos escritos a mano
 
-## Multi-formato sin duplicar el diagrama
+Se validan, no se regeneran. `validate_code.py` los trata en modo lenient: sintaxis, imports,
+convenciones y tipografía siguen bloqueando; la familia STY baja a INFO y se agrupa. Para pasar un
+diagrama viejo al flujo nuevo, descríbelo en un `.diag`.
 
-Si hace falta más de un formato del mismo diagrama, usá
-`outformat=["png", "svg"]` en el `Diagram(...)`, no dos bloques `with Diagram`.
+## Dirección y formatos
 
-## Generá diagramas grandes con datos, no a mano
-
-Un loop corto sobre una lista/dict es preferible a repetir `EC2("web-N")` a mano.
-Si el loop puede generar la misma conexión más de una vez, pasá `strict=True` al
-`Diagram(...)` para que Graphviz la colapse en una sola arista.
+`direction: LR` para flujos de datos o de petición; `TB` para jerarquías o capas. Para obtener varios
+formatos usa `FORMAT=svg make render FILE=...`.

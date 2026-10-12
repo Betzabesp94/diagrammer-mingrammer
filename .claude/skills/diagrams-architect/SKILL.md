@@ -1,227 +1,124 @@
 ---
 name: diagrams-architect
 description: >-
-  Genera y valida diagramas de arquitectura como código Python en diagrams_src/
-  de este repo usando la librería diagrams (mingrammer). Modela primero la
-  arquitectura (nodos, clusters, conexiones), resuelve cada componente a una
-  clase real vía introspección de la instalación (nunca imports inventados),
-  valida sintaxis/imports/topología/convenciones (OUT, FMT, show=False),
-  renderiza con render.sh si Graphviz está disponible, y reporta mapeos,
-  validaciones arquitectónicas básicas (exposición pública, seguridad, HA/AZ,
-  complejidad) y recomendaciones separadas de lo pedido. Usar SIEMPRE que el
-  usuario pida crear, armar, dibujar, actualizar o convertir a código un
-  diagrama de arquitectura (AWS, GCP, Azure, Kubernetes, on-prem, multi-cloud,
-  C4) para este repo, incluso si no menciona 'diagrams' explícitamente, por
-  ejemplo 'dibujame la arquitectura de...', 'pasame este Mermaid a
-  diagrams_src', 'agregale un WAF al diagrama de X' o 'quiero un diagrama
-  estilo Miro/pizarra colaborativa con tarjetas e íconos'.
+  Genera y valida diagramas de arquitectura como código Python (librería diagrams de mingrammer)
+  en este repo, de forma determinista y con estilo limpio tipo Miro. El modelo describe la
+  arquitectura en un DSL corto (.diag); los scripts la convierten a un IR, generan el .py,
+  verifican sintaxis, imports, fidelidad, texto, layout y estilo, renderizan con Graphviz y
+  reportan mapeos de iconos, avisos de arquitectura (exposición pública, seguridad, alta
+  disponibilidad) y recomendaciones por separado. Usar SIEMPRE que el usuario pida crear, armar,
+  dibujar, actualizar, ajustar o pasar a código un diagrama de arquitectura (AWS, GCP, Azure,
+  Kubernetes, on-prem, multi-cloud, C4) para este repo, aunque no mencione 'diagrams'. Ejemplos:
+  'dibuja la arquitectura de...', 'arma un diagrama de...', 'convierte este Mermaid a diagrams_src',
+  'pasa esto a código', 'agrega un WAF al diagrama de X', 'actualiza el diagrama con una cola',
+  'diagrama estilo Miro con íconos de AWS', o un texto con sintaxis tipo eraser.io (`A > B`).
 ---
 
 # diagrams-architect
 
-Genera diagramas de arquitectura como código versionable (`diagrams_src/<slug>.py`)
-usando la librería Python `diagrams`, siguiendo las convenciones de este repo.
+El modelo **modela** la arquitectura; los scripts **generan y verifican**. Nunca se escribe el `.py`
+a mano: sale del IR (`diagrams_src/<slug>.ir.json`), que sale del `.diag`. Mismo `.diag` y mismas
+versiones producen el mismo `.py`, byte a byte, y el mismo render.
 
-> **Carpetas:** `diagrams_ref/` guarda las referencias versionadas (`plantilla.py`,
-> `ejemplo_aws.py`; solo se leen). `diagrams_src/` es donde se escriben los diagramas
-> nuevos y está en `.gitignore`: nunca los agregues a git.
+> **Carpetas.** `diagrams_ref/` guarda las referencias versionadas (`plantilla.diag`, `ejemplo_aws.diag`).
+> `diagrams_src/` es donde van tus diagramas y está en `.gitignore`: nunca los agregues a git.
 
-La idea central: **"el código funciona" no es lo mismo que "el diagrama es
-correcto"**. Un script puede ser Python válido, importar clases reales y
-renderizar sin error en Graphviz, y aun así representar una arquitectura
-equivocada — una conexión que falta, un ícono mapeado al servicio incorrecto, un
-componente que el usuario no pidió. Por eso el flujo es: **modelar → validar →
-recién ahí traducir a código**, no "escribir Python directo".
+## Flujo
 
-## Antes de generar nada: releer el estado real
+1. **Escribe `diagrams_src/<slug>.diag`.** Si el pedido viene en lenguaje natural, tradúcelo tú a ese DSL
+   (no al `.py` ni al IR). Si ya viene con sintaxis tipo eraser o es un Mermaid, pásalo al DSL tal cual.
+2. **Ejecuta** `make diagram IN=diagrams_src/<slug>.diag`. Corre en orden, y se detiene en el primer ERROR:
+   `parse_dsl` → `resolve_ir` → `validate_ir` → `validate_architecture` → `generate_diagram` →
+   `validate_code` → render → `validate_layout` → `check_determinism`.
+3. **Lee** `output/<slug>.report.json`. Si `overall` es `FAIL`, corrige **el `.diag`** y repite.
+4. **Mira el PNG** como control final: ¿se parece a lo pedido?
+5. **Reporta** según `references/report_format.md`, separando lo solicitado, lo inferido y las recomendaciones.
 
-No asumas versiones ni convenciones de memoria. Al empezar cada tarea:
+Antes de empezar, `./render.sh --check` indica si falta Graphviz. Si falta, no lo instales: genera y
+valida el `.py`, y avisa en el reporte con la instrucción de instalación.
 
-1. Confirmá la versión de `diagrams` instalada y el entorno:
-   ```bash
-   .venv/bin/python .claude/skills/diagrams-architect/scripts/introspect_diagrams.py version
-   ./render.sh --check   # avisa si falta Graphviz — nunca lo instales vos
-   ```
-2. Si algo en `diagrams_ref/plantilla.py`, `diagrams_ref/ejemplo_aws.py`, `Makefile`
-   o `render.sh` parece distinto de lo descrito en
-   `references/repo_conventions.md`, confiá en el archivo real, no en la
-   referencia — y si notás una diferencia real, decilo en el reporte.
+## El DSL en un vistazo
 
-## Input aceptado
+```
+title: Pedidos
+direction: LR
+entrypoint: Cliente          // nodo expuesto a internet
+production: true
 
-**Primario: pedido en lenguaje natural.** Es lo esperable — el usuario describe
-componentes, proveedor(es), agrupamientos (VPC/subnet/namespace) y flujo de datos
-en prosa. Vos armás el modelo intermedio a partir de esa descripción.
-
-**Alternativo: una especificación ya estructurada** — un diagrama Mermaid
-existente, una lista tipo "A → B → C", o un JSON/YAML que ya luce como el modelo
-intermedio. Tratalo como una especificación ya resuelta: volcala directo al
-modelo intermedio (sección siguiente) en vez de reinterpretarla como si fuera
-prosa libre. No le pidas al usuario que reescriba su Mermaid en lenguaje natural.
-
-## El pipeline
-
-### 1. Construir el modelo intermedio (IR)
-
-Antes de pensar en clases de `diagrams`, armá mentalmente (o en un JSON temporal
-si el diagrama es grande y preferís no perder track) la estructura de
-`references/ir_schema.md`: nodos con un `id` y un `service` tal como lo describió
-el usuario, clusters para límites reales, edges con su `type`
-(`network`/`event`/`data`/`invocation`/`dependency`/`authentication`), y
-`constraints` (¿hay un entry point de internet? ¿se mencionó "producción"?).
-
-En este paso **no resolvas todavía clases de diagrams** — solo capturá la
-arquitectura tal como la pidieron. Esto es lo que evita que una topología larga
-(A→B→C→D→E) pierda un tramo al traducirse: contás las aristas acá, antes de que
-se disuelvan en código.
-
-### 2. Resolver cada nodo a una clase real (nunca por memoria)
-
-Para cada nodo, buscá la clase con el script de introspección — no confíes en que
-un import "suena correcto":
-
-```bash
-PY=.venv/bin/python
-SCRIPT=.claude/skills/diagrams-architect/scripts/introspect_diagrams.py
-$PY $SCRIPT check aws.compute.EC2          # ¿existe exactamente ese path?
-$PY $SCRIPT search "load balancer"         # no sé el nombre exacto de la clase
-$PY $SCRIPT search bedrock                 # ejemplo real: "aws.bedrock" NO existe,
-                                            # la clase real es diagrams.aws.ml.Bedrock
-$PY $SCRIPT classes aws.network            # ver todo lo que trae un módulo
-$PY $SCRIPT providers                      # aws, gcp, azure, k8s, onprem, generic, ...
+Cliente [icon: aws-users]
+Sistema [boundary: true] {   // grupo; se anidan
+  API [icon: aws-api-gateway, label: "API de pedidos"]
+  Cola [icon: aws-sqs]
+  Datos [icon: aws-dynamodb, tag.multi_az: true]
+}
+Cliente > API: "HTTPS"       // > < <> -   |   A > B, C   |   etiqueta tras ':'
+API > Cola: "publica evento" [type: event]
+Cola > Datos: "escribe"
 ```
 
-Asigná el nivel de confianza correspondiente (`exact` / `inferred` / `generic` /
-`custom` / `ambiguous`, tabla completa en `references/ir_schema.md`) y guardalo —
-va al reporte final, no se pierde. Si `check`/`search` no devuelven nada
-razonable, degradá a `diagrams.generic.*` (agnóstico de proveedor) o, como último
-recurso, `diagrams.custom.Custom(label, icon_path)` con una ruta a un PNG local —
-y reportalo explícitamente. Nunca generes un `from diagrams.x.y import Z` que no
-haya pasado por este chequeo.
+Operadores: `A > B`, `A < B`, `A <> B`, `A - B`, fan-out `A > B, C` y etiqueta `A > B: "HTTPS"`.
+Gramática completa, atributos y errores: `references/dsl.md`.
 
-### 3. Validar el modelo intermedio arquitectónicamente — antes de escribir Python
+## Reglas al escribir el `.diag`
 
-```bash
-.venv/bin/python .claude/skills/diagrams-architect/scripts/validate_architecture.py <ir.json>
-```
+- **Una arista por línea** y **etiquetas específicas**: un verbo o un protocolo (`"HTTPS"`, `"lee"`, `"publica evento"`),
+  nunca `"usa"` ni `"conecta"`.
+- **Iconos reales**: usa `icon: <proveedor>-<servicio>`. Nunca escribas ni inventes un import. Para buscar
+  una clase: `.venv/bin/python .claude/skills/diagrams-architect/scripts/introspect_diagrams.py resolve <nombre> --provider aws`
+  (o `search <texto>`). Si no existe, el icono cae a uno genérico y se reporta (`RES003`).
+- **Grupos solo para límites reales** (VPC, subred, namespace; `boundary: true`). Evita grupos de un solo
+  nodo y más de 5 grupos hermanos.
+- **Declara `entrypoint:` y `production:`** si corresponde: activan las reglas de seguridad y alta disponibilidad.
+- **Cada nodo debe tener aristas**, o marcarse `standalone: true`.
+- No agregues nodos, aristas ni grupos que el usuario no pidió. Si algo implícito hace falta (por ejemplo, la VPC
+  de "una instancia privada"), agrégalo y repórtalo como inferido.
 
-Esto corre las cinco reglas deterministas de `references/architecture_rules.md`
-(networking, seguridad, disponibilidad, observabilidad, complejidad) y devuelve
-`findings` con severidad. Ningún finding de este script bloquea nada — todos son
-WARNING/INFO — pero **tienen que llegar al reporte final tal cual**, nunca
-resolverse en silencio cambiando la topología pedida.
+## Cómo leer el reporte
 
-### 4. Generar `diagrams_src/<slug>.py`
+`overall` es `PASS`, `WARN` o `FAIL`. Lee `overall`, `counts` y los ids de `findings`; abre
+`references/validations.md` solo para los ids que aparezcan.
 
-Seguí exactamente `references/repo_conventions.md` (que resume `plantilla.py` /
-`ejemplo_aws.py`): `OUT` vía `Path(__file__)`, `FMT` vía `os.getenv`, `show=False`,
-nombres de variable por rol, `Cluster` solo para límites reales, `direction`
-según el tipo de arquitectura. No agregues nodos, edges ni clusters que no estén
-en el IR del paso 1 — si te parece que falta algo importante (ej. un `Cluster`
-VPC implícito al decir "una instancia privada"), agregalo pero marcalo
-explícitamente como inferencia en el reporte, nunca en silencio.
+- **ERROR** (bloquea): corrige el `.diag`. Ejemplos: `PAR001` sintaxis, `CONN001` arista a un nodo inexistente,
+  `CLU004` labels de grupo repetidos, `CLU006` más de 5 grupos hermanos, `FID*` el código no es el IR.
+- **WARNING**: se reporta siempre, con su id. Ejemplos: `CONN003` nodo huérfano, `TXT001` label largo,
+  `LAY001`–`LAY008` problemas de layout, `ARQ*` avisos de arquitectura.
+- **INFO**: informa (icono inferido, leyenda, versiones).
 
-**Dos patrones de rendering, misma arquitectura por debajo:**
+**Nunca cambies la topología pedida para callar un warning**: se reporta y el usuario decide. Un warning de
+arquitectura (`ARQ*`) es una recomendación, no un requisito, y no se aplica al diagrama.
 
-- **Clásico (default):** `ClassName("label")` + `a >> Edge(...) >> b`. Más
-  corto, ya cumple todas las convenciones — usalo salvo que el pedido diga lo
-  contrario.
-- **Design system "pizarra/Miro" (opcional):** cuando el usuario pide
-  explícitamente una estética más visual/informal ("estilo Miro", "board
-  colaborativo", "pizarra", tarjetas con ícono+descripción, flechas numeradas
-  con badges), usá `service_card()` / `internal_card()` / `flow()` /
-  `sticky_note()` — ver `references/design_system.md` y copiá el bloque de
-  `assets/design_system_template.py`. Es una capa de *rendering* sobre el
-  mismo IR: no agrega, quita ni reinterpreta nodos/edges/clusters respecto del
-  paso 1, solo cambia cómo se dibujan.
+## Estilo
 
-### 5. Validar el `.py` generado (técnica + fidelidad)
+El estilo vive en un único bloque `# === STYLE ===` del `.py` (fuente, tamaños, paleta, dirección, separaciones,
+splines). Para cambiarlo de forma persistente usa directivas en el `.diag`: `style.FONT_SIZE_NODE: 13`,
+`style.LABEL_WRAP: 20`, `splines: ortho`, `direction: TB`. Editar el bloque en el `.py` sirve para probar y se
+pierde al regenerar. Detalle, paleta y contraste: `references/style_system.md`.
 
-```bash
-.venv/bin/python .claude/skills/diagrams-architect/scripts/validate_diagram.py \
-    diagrams_src/<slug>.py --ir <ir.json>
-```
+## Reglas duras
 
-(Omití `--ir` si no armaste un JSON explícito del modelo — igual vas a obtener
-`syntax`/`imports`/`diagram_context`/`conventions`, solo que sin el conteo de
-fidelidad automático; en ese caso comparalo vos a mano contra el IR mental del
-paso 1.)
-
-Si `overall` es `FAIL`, **no está terminado**: mirá `failed_dimensions`, corregí,
-y volvé a correr. Un import que no existe, un nodo creado fuera del
-`with Diagram(...)`, o `missing_edges > 0` son bloqueantes — no se reportan como
-"éxito con una advertencia".
-
-### 6. Renderizar (si Graphviz está disponible)
-
-```bash
-make render FILE=<slug>.py
-# o: ./render.sh <slug>
-```
-
-Si `render.sh --check` ya avisó que falta Graphviz, no lo intentes igual ni
-instales nada — reportá el `.py` como generado y validado, y anotá en "Rendered:"
-que falta Graphviz con la instrucción (`brew install graphviz` / etc., la misma
-que ya imprime `render.sh`).
-
-Si renderizó, y podés ver la imagen (sos multimodal), mirala: ¿se parece
-razonablemente a lo pedido? Esto reemplaza heurísticas de visión por computadora
-(cruces de líneas, densidad) — más simple y más confiable acá.
-
-### 7. Reportar
-
-Usá exactamente la estructura de `references/report_format.md`. El reporte no es
-opcional ni un anexo — es lo que demuestra que la arquitectura fue validada, no
-solo "escrita". Separá siempre tres cosas en la respuesta al usuario:
-
-- **Lo solicitado** — tal como se generó.
-- **Lo inferido** — nodos con confianza `inferred`/`generic`/`custom`/`ambiguous`,
-  o componentes que agregaste sin que te lo pidieran explícitamente.
-- **Recomendaciones** — findings de `validate_architecture.py` y cualquier otra
-  sugerencia de Solutions Architect, listadas aparte, nunca aplicadas al `.py`
-  sin que el usuario lo pida.
-
-## Reglas duras (ver `references/architecture_rules.md` para el detalle completo)
-
-- Nunca generes un import de `diagrams` que no haya sido verificado por
-  `introspect_diagrams.py`.
-- Nunca agregues infraestructura, servicios o componentes que el usuario no pidió,
-  salvo que sean estrictamente necesarios para representar algo que sí pidió — y
-  en ese caso, decilo.
-- Un `WARNING` o `INFO` de validación nunca dispara una corrección silenciosa de
-  la topología pedida.
-- Ante ambigüedad, preguntá solo si cambia la arquitectura de forma significativa;
-  si no, elegí una interpretación razonable y anotala en el reporte.
-- No instales Graphviz ni ninguna dependencia — solo detectá y avisá.
-- Un diagrama por archivo en `diagrams_src/`; no mezcles varios pedidos en un
-  mismo `.py` salvo que el usuario lo pida así.
-- **Tipografía: siempre `Helvetica-Bold`/`Helvetica`** (fallback `Arial`,
-  después `Times-Roman`). **Nunca uses `Bradley Hand` ni otras fuentes
-  "hand-drawn"**, ni siquiera si el pedido describe una estética
-  informal/pizarra/Miro — la regla aplica tanto a `fontname=...` como a un
-  `FACE="..."` dentro de un label HTML del design system;
-  `scripts/validate_diagram.py` chequea las dos formas y lo marca como error.
-  Conseguí el look "pizarra" con colores/clusters/cards/sticky notes (ver
-  `references/design_system.md`), no con la fuente.
+1. **Nunca edites el `.py` ni el `.ir.json`**: se regeneran. Cualquier cambio va en el `.diag`.
+2. **Nunca instales Graphviz** ni nada del sistema por tu cuenta.
+3. **Nunca uses una fuente hand-drawn o informal** (Comic Sans, Bradley Hand…): solo Helvetica, Arial o Times-Roman.
+4. **Nunca agregues a git** archivos de `diagrams_src/` ni de `output/`.
+5. **Registra versiones** (`env` del reporte: `diagrams` y Graphviz) en el reporte final.
+6. Los archivos escritos a mano en `diagrams_src/` se validan (`make validate FILE=...`), no se regeneran.
 
 ## Fuera de alcance
 
-No generes Mermaid (ese es el proyecto hermano — si el usuario quiere Mermaid,
-decíselo en vez de improvisar). No es una skill de wireframes/UI/flowcharts no
-técnicos. No es un validador de Well-Architected exhaustivo — ver
-`references/architecture_rules.md`. No dividís automáticamente un diagrama
-grande, solo lo advertís.
+No genera Mermaid (existe un proyecto hermano para eso); no audita Well-Architected completo; no divide un
+diagrama grande por su cuenta (solo avisa con `SIZ001`/`SIZ002`/`LAY008` y sugiere dividir); no mezcla
+niveles de abstracción por iniciativa propia.
 
-## Recursos de esta skill
+## Recursos
 
 | Archivo | Cuándo leerlo |
 |---|---|
-| `scripts/introspect_diagrams.py` | Siempre, para resolver cada nodo a una clase real (paso 2) |
-| `scripts/validate_diagram.py` | Siempre, después de generar el `.py` (paso 5) |
-| `scripts/validate_architecture.py` | Cuando armaste el IR y antes de generar el `.py` (paso 3) |
-| `references/ir_schema.md` | Al construir el modelo intermedio — esquema completo y niveles de confianza |
-| `references/architecture_rules.md` | Detalle de las 5 reglas arquitectónicas y los principios de fidelidad no negociables |
-| `references/report_format.md` | Formato exacto del reporte final |
-| `references/repo_conventions.md` | Anatomía de un `.py` de este repo, si necesitás más detalle que el resumen de arriba |
-| `references/design_system.md` | Patrón opcional "pizarra/Miro": cards de servicio, badges numerados, estilos semánticos de conexión |
-| `assets/design_system_template.py` | Bloque copy-paste con los helpers del design system (`service_card`, `internal_card`, `flow`, `sticky_note`) |
+| `references/dsl.md` | escribir o corregir un `.diag`; un error `PAR001` |
+| `references/validations.md` | cualquier id de finding del reporte |
+| `references/style_system.md` | cambiar fuente, tamaño o paleta; labels que desbordan; `ortho` |
+| `references/ir_schema.md` | depurar el IR o un error `SCH*` |
+| `references/architecture_rules.md` | avisos `ARQ*` y principios de fidelidad |
+| `references/report_format.md` | redactar la respuesta final |
+| `references/repo_conventions.md` | carpetas, comandos y forma del `.py` generado |
+| `scripts/` | `pipeline.py` orquesta todo; los demás se pueden ejecutar solos para depurar |
+| `evals/pipeline_evals.json` | casos verificables por script (`make evals`) |

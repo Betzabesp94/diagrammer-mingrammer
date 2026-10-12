@@ -1,0 +1,52 @@
+title: Diagrama grande
+
+N0 [icon: aws-ec2]
+N1 [icon: aws-ec2]
+N2 [icon: aws-ec2]
+N3 [icon: aws-ec2]
+N4 [icon: aws-ec2]
+N5 [icon: aws-ec2]
+N6 [icon: aws-ec2]
+N7 [icon: aws-ec2]
+N8 [icon: aws-ec2]
+N9 [icon: aws-ec2]
+N10 [icon: aws-ec2]
+N11 [icon: aws-ec2]
+N12 [icon: aws-ec2]
+N13 [icon: aws-ec2]
+N14 [icon: aws-ec2]
+N15 [icon: aws-ec2]
+N16 [icon: aws-ec2]
+N17 [icon: aws-ec2]
+N18 [icon: aws-ec2]
+N19 [icon: aws-ec2]
+N20 [icon: aws-ec2]
+N21 [icon: aws-ec2]
+
+N0 > N1: "lee"
+N1 > N2: "lee"
+N2 > N3: "lee"
+N3 > N4: "lee"
+N4 > N5: "lee"
+N5 > N6: "lee"
+N6 > N7: "lee"
+N7 > N8: "lee"
+N8 > N9: "lee"
+N9 > N10: "lee"
+N10 > N11: "lee"
+N11 > N12: "lee"
+N12 > N13: "lee"
+N13 > N14: "lee"
+N14 > N15: "lee"
+N15 > N16: "lee"
+N16 > N17: "lee"
+N17 > N18: "lee"
+N18 > N19: "lee"
+N19 > N20: "lee"
+N20 > N21: "lee"
+N21 > N0: "lee"
+N0 > N5: "escribe"
+N1 > N6: "escribe"
+N2 > N7: "escribe"
+N3 > N8: "escribe"
+N4 > N9: "escribe"

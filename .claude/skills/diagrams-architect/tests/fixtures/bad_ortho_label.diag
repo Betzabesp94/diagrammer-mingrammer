@@ -1,0 +1,7 @@
+title: Ortho con labels
+splines: ortho
+Web [icon: aws-ec2]
+API [icon: aws-ec2]
+DB [icon: aws-rds]
+Web > API: "HTTPS"
+API > DB: "SQL"
