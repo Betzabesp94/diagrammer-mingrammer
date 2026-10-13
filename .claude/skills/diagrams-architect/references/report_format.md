@@ -22,6 +22,7 @@ Generado:  diagrams_src/<slug>.py  (desde <slug>.diag)
 Render:    output/<slug>.png   | o: Graphviz no está instalado (brew install graphviz); el .py está validado
 Entorno:   diagrams <versión> · Graphviz <versión> · Python <versión>
 Resultado: PASS | WARN | FAIL   (errores N · avisos N · info N)
+Miro:      <URL del board>   | o: no disponible / no publicado (motivo)   (solo con el MCP de Miro; ver miro.md)
 
 Solicitado     lo que se dibujó tal como se pidió
 Inferido       cada nodo con mapping.not_exact (clase y motivo), y todo componente que agregaste sin que se pidiera
@@ -35,3 +36,4 @@ Recomendaciones  findings ARQ* y cualquier sugerencia de arquitectura; aparte y 
 - Los mapeos que no son `exact` se listan uno por uno con su motivo, no solo se cuentan.
 - Si falta Graphviz, no falla el resultado: indica "Render: no ejecutado" y la instrucción de instalación.
 - Mira el PNG como control final: ¿se parece razonablemente a lo pedido?
+- Si publicaste en Miro, di cuántos nodos, aristas y grupos quedaron, qué íconos no tienen URL y que el `.diag` sigue siendo la fuente.

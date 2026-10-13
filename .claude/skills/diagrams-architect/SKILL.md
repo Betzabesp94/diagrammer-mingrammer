@@ -11,7 +11,9 @@ description: >-
   Kubernetes, on-prem, multi-cloud, C4) para este repo, aunque no mencione 'diagrams'. Ejemplos:
   'dibuja la arquitectura de...', 'arma un diagrama de...', 'convierte este Mermaid a diagrams_src',
   'pasa esto a código', 'agrega un WAF al diagrama de X', 'actualiza el diagrama con una cola',
-  'diagrama estilo Miro con íconos de AWS', o un texto con sintaxis tipo eraser.io (`A > B`).
+  'diagrama estilo Miro con íconos de AWS', 'súbelo a Miro', 'ponlo en el board', o un texto con
+  sintaxis tipo eraser.io (`A > B`). Si el MCP de Miro está conectado, publica además el diagrama
+  como board editable con los mismos íconos.
 ---
 
 # diagrams-architect
@@ -32,10 +34,33 @@ versiones producen el mismo `.py`, byte a byte, y el mismo render.
    `validate_code` → render → `validate_layout` → `check_determinism`.
 3. **Lee** `output/<slug>.report.json`. Si `overall` es `FAIL`, corrige **el `.diag`** y repite.
 4. **Mira el PNG** como control final: ¿se parece a lo pedido?
-5. **Reporta** según `references/report_format.md`, separando lo solicitado, lo inferido y las recomendaciones.
+5. **Publica en Miro si está disponible** (ver abajo). Con el MCP de Miro conectado se hace siempre, salvo que el pipeline
+   termine en `FAIL` o el usuario diga que no.
+6. **Reporta** según `references/report_format.md`, separando lo solicitado, lo inferido y las recomendaciones.
 
 Antes de empezar, `./render.sh --check` indica si falta Graphviz. Si falta, no lo instales: genera y
 valida el `.py`, y avisa en el reporte con la instrucción de instalación.
+
+## Miro (MCP)
+
+Después de un pipeline en `PASS` o `WARN`, comprueba si hay herramientas `canvas_*` de Miro (si están diferidas,
+`ToolSearch` con `miro canvas`). Si las hay, publica el diagrama como board editable; si no, sigue con PNG y reporte
+y avisa "Miro: no disponible". El procedimiento completo está en `references/miro.md`; lo esencial:
+
+- **Confirma el board destino antes del primer envío**: los diagramas son de clientes y publicar es una acción externa.
+  Usa la URL que dé el usuario; crear un board nuevo (`board_create`) o compartirlo exige confirmación previa.
+- **Orden:** `canvas_get_canvas_composer_skill` (pasos `design` y `dsl`, una vez por conversación) →
+  `canvas_create_from_svg` → `canvas_read_as_svg` para verificar → `canvas_update_from_svg` para iterar.
+  Las herramientas `diagram_*`, `layout_*`, `context_*` y `doc_*` fueron retiradas: no las uses.
+- **El SVG sale del IR y del SVG de Graphviz** (posiciones y ruta del PNG de cada nodo), no de memoria.
+- **Íconos como imagen desde jsDelivr con versión fija**: `https://cdn.jsdelivr.net/gh/mingrammer/diagrams@<env.diagrams>/resources/<proveedor>/<categoría>/<archivo>.png`.
+  Verifica la URL (`200`, `image/png`); si falla, el nodo se dibuja como rect con label y se reporta.
+- **Grupos:** un frame por cluster de primer nivel; los anidados y los punteados son rects (un frame no admite borde).
+  Conectores antes que nodos (el orden de creación es el z-order) y `&`, `<`, `>` escapados.
+- **Verifica y reporta:** revisa `failed_items`, reposiciona lo que Miro redimensione, compara conteos con el IR y pide
+  al usuario que mire el render; la lectura prueba la estructura, no la apariencia.
+- **El `.diag` manda.** Los cambios se hacen en el `.diag` y se re-publican con los `data-miro-id` guardados en
+  `diagrams_src/<slug>.miro.json`. Borrar elementos del board siempre se confirma antes.
 
 ## El DSL en un vistazo
 
@@ -102,6 +127,8 @@ pierde al regenerar. Detalle, paleta y contraste: `references/style_system.md`.
 4. **Nunca agregues a git** archivos de `diagrams_src/` ni de `output/`.
 5. **Registra versiones** (`env` del reporte: `diagrams` y Graphviz) en el reporte final.
 6. Los archivos escritos a mano en `diagrams_src/` se validan (`make validate FILE=...`), no se regeneran.
+7. **Nunca publiques en Miro con el pipeline en `FAIL`**, ni envíes datos a un board sin confirmar el destino,
+   ni compartas un board, ni borres elementos sin confirmación. Solo los íconos viajan a servicios públicos.
 
 ## Fuera de alcance
 
@@ -118,6 +145,7 @@ niveles de abstracción por iniciativa propia.
 | `references/style_system.md` | cambiar fuente, tamaño o paleta; labels que desbordan; `ortho` |
 | `references/ir_schema.md` | depurar el IR o un error `SCH*` |
 | `references/architecture_rules.md` | avisos `ARQ*` y principios de fidelidad |
+| `references/miro.md` | publicar o actualizar un diagrama en Miro con el MCP |
 | `references/report_format.md` | redactar la respuesta final |
 | `references/repo_conventions.md` | carpetas, comandos y forma del `.py` generado |
 | `scripts/` | `pipeline.py` orquesta todo; los demás se pueden ejecutar solos para depurar |
