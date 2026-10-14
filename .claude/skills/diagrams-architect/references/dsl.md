@@ -66,7 +66,9 @@ Graphviz fusiona los repetidos (`CLU004`). Un nodo pertenece al grupo donde se d
 
 - `type`: `network` (por defecto), `event` (discontinua), `data`, `invocation`, `dependency`
   (punteada), `authentication` (color de acento). Los trazos con significado generan leyenda.
-- `emphasis: true` resalta el flujo con el color de acento y más grosor.
+- `emphasis: true` marca un paso del **flujo principal**: lo resalta con el color de acento y más grosor, y define
+  qué flechas pueden llevar etiqueta. Solo los pasos del flujo principal llevan texto; las relaciones secundarias van
+  sin etiqueta y se explican aparte (`FLW001`). Si nada lleva `emphasis`, se reporta `FLW007`.
 - La etiqueta dice un verbo o un protocolo: `"HTTPS"`, `"publica evento"`, `"lee"`.
   Nunca `"usa"` ni `"conecta"` (`TXT003`).
 - No hay cadenas: `A > B > C` es un error. Escribe una arista por línea.

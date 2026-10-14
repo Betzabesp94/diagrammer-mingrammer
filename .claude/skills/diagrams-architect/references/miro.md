@@ -10,6 +10,10 @@ derivada, como el `.py` y el PNG. Probado el 13/10/2026 con `calificacion_leads`
   Si aparecen solo como herramientas diferidas, cárgalas con `ToolSearch` (consulta: `miro canvas`); si el servidor
   aún está conectando, espera ese resultado antes de decir que no hay Miro.
 - **Solo después de que el pipeline termine en `PASS` o `WARN`.** Con `FAIL` no se publica nada.
+- **Antes de publicar, revisa `FLW*` y `SIZ003`.** En Miro las flechas las enruta Miro y no se pueden medir: con más de
+  7 etiquetas, hubs de más de 7 conexiones o muchas flechas de ida y vuelta, las etiquetas se pisan y no se leen
+  (pasó el 14/10/2026 con los casos v2 de El País). Si el pedido lo permite, corrige el `.diag`; si no, publica y
+  reporta los avisos. No marques un grupo de un solo nodo como `boundary: true` solo para callar `CLU002`.
 - **Sin MCP de Miro**, el flujo normal no cambia: PNG + reporte, y el reporte dice "Miro: no disponible".
 - Las herramientas `diagram_*`, `layout_*`, `context_*` y `doc_*` fueron retiradas el 14/09/2026. No las uses
   aunque el modelo las recuerde: la familia vigente es `canvas_*`.
@@ -107,22 +111,37 @@ https://cdn.jsdelivr.net/gh/mingrammer/diagrams@<VERSIÓN>/resources/<proveedor>
 | Diagrama completo | Un frame `<g data-frame="<title del .diag>">` blanco que contiene todo el diagrama |
 | Cluster (cualquier nivel) | `<rect rx="12">` con `fill` = `bgcolor`, `stroke` = `pencolor` y `data-content` arriba a la izquierda |
 | Cluster con `style: dashed` | `stroke-dasharray="5,5"` en el rect. **Un frame no admite borde**, así que un grupo punteado es siempre un rect |
-| Arista | `<line data-start data-end data-arrow="end">` entre los ids locales de las imágenes |
-| Arista `<>` | `data-arrow="both"` |
+| Arista del flujo principal (`emphasis: true`) | `<line>` con `stroke="#313131"`, `stroke-width="2"`, `data-arrow="end"` y `data-content` con número y etiqueta (`① carga de lote`) |
+| Arista secundaria | `<line>` gris fina (`stroke="#868E96"`, `stroke-width="1"`), **sin** `data-content` |
+| Arista `<>` | evítala: la respuesta síncrona está implícita (`FLW004`). Si el pedido la exige, `data-arrow="both"` |
 | Arista `type: async` o `event`, o nodo `dashed` | `stroke-dasharray="5,5"` |
-| Label de arista | `data-content` corto; Miro lo dibuja sobre la línea |
+| Elementos "a validar" que llegan al mismo destino | un solo rect punteado que los agrupa y **una** flecha desde el rect (un rect es un widget: acepta conectores) |
+| Explicación (componentes, flujo principal, flujos) | un **frame aparte**, `"<título> - Explicación"`, a la derecha del diagrama. El diagrama queda como imagen limpia |
 
 ### Reglas del SVG
 
 - **Orden de creación = z-order.** Primero los rects de cluster, luego los conectores, al final imágenes y textos.
 - **Un frame por diagrama** y los clusters como rects dentro de él (los frames no se anidan). Así el diagrama se
   busca por su nombre y se mueve entero, y los conectores no cruzan frames.
-- **Layout por columnas de capa:** una columna por cluster en el orden del `.diag` (los hijos de un contenedor como
-  `Nube AWS` van dentro de un rect que los envuelve), los nodos sin cluster en una última columna, y la banda
-  transversal abajo a todo el ancho. Dentro de cada columna, los nodos siguen el orden vertical que les dio Graphviz.
+- **Layout en grilla alrededor de un eje** (formato v3, aceptado el 14/10/2026 con el caso 1 de El País):
+  - El **flujo principal va en una sola fila**, de izquierda a derecha, con flechas rectas entre celdas vecinas.
+  - Lo demás **cuelga de ese eje**: arriba o abajo del componente con el que habla (Cognito bajo Amplify, Athena bajo
+    S3, API Gateway sobre Lambda, DynamoDB bajo Bedrock).
+  - El **actor va pegado a su punto de entrada**, en la primera celda del eje, nunca en un extremo lejano.
+  - **Sin carriles fijos por capa.** Los grupos son solo límites reales: `Nube AWS`, un rect punteado de "a validar"
+    (puede quedar sobre el borde de la nube) y la banda transversal abajo, en una sola fila.
+  - **Callouts (máximo 2)** en celdas libres, fuera de todo recorrido.
+  - Celdas de unos 300 x 270 px; ícono de 90 px con el nombre en negrita y **una** línea debajo. Frame en 16:9.
+  - Si el pedido trae la grilla (fila x columna), respétala tal cual. Si no, propón una antes de publicar.
+  Las columnas fijas por capa (formato v2) quedaron descartadas: separaban componentes que se hablan, alargaban las
+  flechas de los actores y hacían que las etiquetas se pisaran.
 - Dentro de un frame las coordenadas son **relativas** a su `translate`; fuera, absolutas.
-- Fija `data-start-side` y `data-end-side` según `direction` (`LR`: derecha a izquierda; `TB`: abajo a arriba) y usa
-  `data-shape="straight"` o `"elbowed"`, nunca `curved`.
+- **Miro no acepta puntos de quiebre**: solo `data-start-side` y `data-end-side`; el recorrido lo calcula Miro. Fija
+  los lados para que la ruta tome el hueco libre: entre celdas vecinas del eje, derecha a izquierda; hacia una celda
+  de arriba o abajo, `top`/`bottom`; para rodear por el margen superior, `top` a `top`. Usa `data-shape="elbowed"`,
+  nunca `curved`.
+- **Evita que dos flechas compartan el mismo lado de un nodo** (Miro las traza encimadas y una etiqueta puede quedar
+  sobre la otra). Si es inevitable, avisa al usuario qué pares revisar.
 - Separa los frames de un mismo board unos 400 px y colócalos uno debajo del otro; si Miro desplaza el lote
   (auto-colocación), sigue con las coordenadas del `result_svg`.
 - **Escapa** `&`, `<` y `>` en todo atributo y texto (`&amp;`, `&lt;`, `&gt;`). Un `&` sin escapar hace fallar todo el SVG.
@@ -137,7 +156,12 @@ https://cdn.jsdelivr.net/gh/mingrammer/diagrams@<VERSIÓN>/resources/<proveedor>
 
 ## 5. Después de crear
 
-1. **Lee la respuesta completa.** Revisa `failed_items` y `skipped`: si algo falló, corrígelo con `canvas_update_from_svg`.
+1. **Lee la respuesta completa.** Revisa `failed_items` y `skipped`: si algo falló, corrígelo con `canvas_update_from_svg`
+   (ver "Agregar elementos a un frame ya creado").
+   - **Imagen rechazada** (`The image could not be fetched from the provided URL`) con una URL que responde `200`: es un
+     fallo puntual de descarga de Miro, no de la URL. Pasó el 14/10/2026 con íconos que en otras llamadas cargaron bien.
+     Reintenta solo esa imagen. Los conectores que la usaban aparecen en `skipped` (`connector endpoint unresolved`):
+     reintenta también esos, en la misma llamada.
 2. **Auto-colocación.** Si hay contenido en el área pedida, Miro desplaza todo el lote y lo avisa
    (`auto-placement moved this batch by x=…`). Desde ese momento usa las coordenadas del `result_svg`, no las que enviaste.
 3. **Dimensiones cambiadas.** Si la respuesta reporta ids con otra altura (los `textArea` crecen), reposiciona lo que se
@@ -148,6 +172,33 @@ https://cdn.jsdelivr.net/gh/mingrammer/diagrams@<VERSIÓN>/resources/<proveedor>
 5. **Guarda el vínculo** en `diagrams_src/<slug>.miro.json` (la carpeta está ignorada por git): proyecto, URL del
    board, `data-miro-id` del frame y su enlace `?moveToWidget=`. Los ids de cada elemento se recuperan leyendo el
    frame (`canvas_read_as_svg` con `widget_ids=[<frame>]`). Sirve para actualizar sin duplicar.
+
+### Agregar elementos a un frame ya creado
+
+Para reintentar o sumar elementos dentro de un frame existente, envuelve los nuevos en la **forma completa del frame**:
+el `<g>` con `data-frame`, `data-miro-id` y `transform`, y su `<rect data-type="frame">`. Las coordenadas de los hijos
+son relativas al frame. Si un conector apunta a un elemento que ya existe, incluye un stub de ese elemento con su
+`data-miro-id` y su `data-type`, sin `x` ni `y`, para no moverlo.
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg">
+<g id="f" data-miro-id="<frame>" transform="translate(X,Y)" data-frame="<título>">
+<rect data-type="frame" x="0" y="0" width="W" height="H" fill="#ffffff" data-title="<título>" />
+<image id="destino" data-miro-id="<id existente>" data-type="image" />
+<image id="nuevo" data-type="image" href="<URL>" x="164" y="192" width="90" height="90" />
+</g>
+<line id="e1" data-start="nuevo" data-end="destino" data-arrow="end" data-shape="elbowed" ... />
+</svg>
+```
+
+Lo que no funciona (probado el 14/10/2026):
+- Un `<g data-miro-id>` **sin** `data-frame` se ignora: los hijos se crean sueltos en el lienzo, fuera del frame,
+  aunque queden en la posición correcta.
+- Un elemento ya creado fuera del frame **no se puede mover adentro** (`target parent is not the actual parent`). La
+  única salida es borrarlo y recrearlo dentro, y borrar requiere confirmación del usuario. El usuario también puede
+  arrastrarlo al frame desde Miro.
+- Un stub de un elemento existente con `x` e `y` dentro de un `<g>` que no es el frame intenta moverlo a coordenadas
+  absolutas y Miro lo rechaza.
 
 ## 6. Actualizar un diagrama ya publicado
 
@@ -172,6 +223,17 @@ Prueba con 3 nodos, 2 conectores, un frame con color y un rect punteado en un bo
 | ¿Textos largos? | `textArea` con ancho fijo hace wrap y crece en altura (59, 79 y 98 px para 14 px de fuente). Falta confirmar el render. |
 | ¿jsDelivr con versión fija? | Sí, `diagrams@0.24.4` y `@0.25.1` sirven `image/png`. |
 | Lo que cambia Miro | Reescribe el `href` de las imágenes a `api.miro.com/.../resources/images/...`; pone `open_sans` y `#1a1a1a` si no fijas fuente ni color; devuelve los conectores con `x1=0 y1=0 x2=1 y2=1` (lo que vale son `data-start` y `data-end`). |
+
+### Formato v3 (14/10/2026, caso 1 de El País)
+
+| Qué se vio | Cómo evitarlo |
+|---|---|
+| Las etiquetas del flujo principal se leen bien en tramos rectos entre celdas vecinas | mantener el eje en una fila y solo esas flechas con texto |
+| Una etiqueta en un tramo vertical se dibuja girada (`⑥ resultado`) | preferir que la flecha con etiqueta termine en horizontal: destino a la derecha, no debajo |
+| Una flecha secundaria de abajo a abajo pasó justo sobre los nombres de los nodos (Lambda → S3) | los textos van debajo del ícono: para rodear por abajo, deja una fila libre o usa otro lado |
+| Una ruta por el margen superior cruzó el rect punteado de "a validar" (Amplify → API Gateway) | no pongas grupos en la fila por la que rodea la flecha, o sube el margen |
+| ⑤ y ⑥ salen del mismo lado de Lambda y sus etiquetas quedan pegadas | separar los destinos (uno a la derecha, otro abajo) o etiquetar solo uno |
+| Miro volvió a rechazar 3 íconos por descarga | reintentar con la forma completa del frame (ver sección 5) |
 
 ## 8. Qué reportar
 

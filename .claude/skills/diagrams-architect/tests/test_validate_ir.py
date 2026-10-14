@@ -139,5 +139,53 @@ class ValidateIR(unittest.TestCase):
         self.assertIn("RES011", got)
 
 
+    def test_flow_and_legibility(self):
+        def hub(n_spokes, **edge_kw):
+            def fn(ir):
+                ir["nodes"] = [node("hub", cluster="vpc")] + [node(f"n{i}", cluster="vpc") for i in range(n_spokes)]
+                ir["edges"] = [edge(f"e{i}", "hub", f"n{i}", **edge_kw) for i in range(n_spokes)]
+            return fn
+        self.assertNotIn("FLW003", ids(run(mutated(hub(7)))))
+        self.assertIn("FLW003", ids(run(mutated(hub(8)))))
+        self.assertIn("SIZ003", ids(run(mutated(hub(15)))))
+        unmarked = ids(run(mutated(hub(8, label="lee"))))
+        self.assertIn("FLW007", unmarked)
+        self.assertNotIn("FLW001", unmarked)
+
+        def main_flow(ir):  # 3 pasos principales con etiqueta y 1 secundaria con etiqueta
+            hub(4, label="lee")(ir)
+            for e in ir["edges"][:3]:
+                e["emphasis"] = True
+        got = run(mutated(main_flow)).to_dict(False)["findings"]
+        flw = [f for f in got if f["id"] == "FLW001"]
+        self.assertEqual(len(flw), 1)
+        self.assertEqual(flw[0]["subject"], "e3")
+        self.assertEqual(flw[0]["expected"], 3)
+        self.assertNotIn("FLW001", ids(run(mutated(lambda ir: [e.update(emphasis=True) for e in ir["edges"]]))))
+        self.assertIn("FLW004", ids(run(mutated(hub(3, arrow="both")))))
+        self.assertNotIn("FLW004", ids(run(mutated(hub(2, arrow="both")))))
+        long_label = run(mutated(lambda ir: ir["edges"][0].update(label="① envía la nota y la guía de estilo")))
+        self.assertIn("FLW002", ids(long_label))
+        short_label = run(mutated(lambda ir: ir["edges"][0].update(label="① consultas y decisiones del panel")))
+        self.assertNotIn("FLW002", ids(short_label))
+
+    def test_callouts_and_dashed_sources(self):
+        note = {"shape": "note"}
+
+        def callouts(ir):
+            for i in range(3):
+                ir["nodes"].append(node(f"nota{i}", cluster="vpc", extensions=note))
+                ir["edges"].append(edge(f"a{i}", "api", f"nota{i}", arrow="none", extensions={"style": "dotted"}))
+        got = ids(run(mutated(callouts)))
+        self.assertIn("FLW005", got)
+        self.assertNotIn("FLW003", got)  # las anclas de notas no cuentan como conexiones del hub
+
+        def dashed(ir):
+            for i in range(2):
+                ir["nodes"].append(node(f"x{i}", cluster="vpc", extensions={"style": "dashed"}))
+                ir["edges"].append(edge(f"d{i}", f"x{i}", "db"))
+        self.assertIn("FLW006", ids(run(mutated(dashed))))
+
+
 if __name__ == "__main__":
     unittest.main()

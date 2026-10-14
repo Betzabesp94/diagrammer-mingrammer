@@ -9,6 +9,7 @@ Corre sobre el IR, antes de generar nada. Familias (ids en references/validation
   CONN  aristas a nodos inexistentes, duplicadas, self-loops, nodos huérfanos
   CLU   clusters vacíos, de un solo nodo, profundidad, labels duplicados, colores
   SIZ   tamaño del diagrama
+  FLW   flujo y legibilidad: etiquetas, hubs, bidireccionales, notas y elementos a validar
   TXT   ancho estimado de labels, tamaño de fuente, etiquetas vagas
   STY   fuentes permitidas y contraste del STYLE efectivo
   RES   iconos genéricos, ambigüedades, passthrough y elementos no soportados
@@ -31,6 +32,12 @@ MAX_ZONES = 5
 MIN_FONT_PX = 13  # legibilidad al DPI por defecto de Graphviz (96)
 DPI = 96
 NODE_TEXT_MARGIN_PT = 8
+LEGIBLE_NODES = 14        # SIZ003: tope para una vista legible (Miro o ejecutiva)
+MAX_LABEL_WORDS = 3       # FLW002, sin contar conectores
+CONNECTORS = {"y", "e", "o", "u", "de", "del", "a", "al", "en", "por", "para", "con", "sin", "la", "el", "los", "las"}
+MAX_HUB_DEGREE = 7        # FLW003
+MAX_BIDIRECTIONAL = 2     # FLW004
+MAX_CALLOUTS = 2          # FLW005
 
 
 def check_schema(ir, rep):
@@ -177,6 +184,89 @@ def check_size(ir, rep, max_nodes, max_edges):
                 hint="Considera dividir el diagrama por dominio o por flujo.")
 
 
+def is_note(n):
+    return (n.get("extensions") or {}).get("shape") == "note"
+
+
+def visible_edges(ir):
+    """Aristas que se dibujan entre componentes: sin las invisibles ni las anclas de las notas."""
+    notes = {n["id"] for n in ir["nodes"] if is_note(n)}
+    return [e for e in irlib.flow_edges(ir)
+            if "invis" not in str((e.get("extensions") or {}).get("style", ""))
+            and e["source"] not in notes and e["target"] not in notes]
+
+
+def label_words(label):
+    """Palabras de una etiqueta, sin contar marcadores como '①' o '(3)' ni conectores como 'y' o 'de'."""
+    return [w for w in label.split() if any(ch.isalpha() for ch in w) and w.lower().strip("(),.;:") not in CONNECTORS]
+
+
+def check_flow(ir, rep):
+    nodes = irlib.flow_nodes(ir)
+    components = [n for n in nodes if not is_note(n)]
+    edges = visible_edges(ir)
+    connected = {end for e in edges for end in (e["source"], e["target"])}
+    # La banda transversal (íconos sin flechas) no cuenta: solo lo que participa del flujo o se marcó standalone.
+    in_view = [n for n in components if n["id"] in connected or n.get("standalone")]
+    if len(in_view) > LEGIBLE_NODES:
+        rep.add("SIZ003", "INFO", "size", f"{len(in_view)} componentes en el flujo (más de {LEGIBLE_NODES} cuesta leerlos en una vista)",
+                expected=LEGIBLE_NODES, found=len(in_view),
+                hint="Para Miro o una vista ejecutiva, agrupa o divide el diagrama.")
+    labeled = [e for e in edges if (e.get("label") or "").strip()]
+    main = [e for e in edges if e.get("emphasis")]
+    if main:
+        # El máximo de etiquetas lo define el flujo principal: solo sus pasos llevan texto.
+        secondary = [e for e in labeled if not e.get("emphasis")]
+        if secondary:
+            rep.add("FLW001", "WARNING", "flow",
+                    f"{len(secondary)} flechas fuera del flujo principal llevan etiqueta (el flujo principal tiene {len(main)} pasos)",
+                    expected=len(main), found=len(labeled), subject=", ".join(e["id"] for e in secondary),
+                    hint="Quita la etiqueta de las relaciones secundarias y explícalas aparte, o márcalas emphasis si son del flujo principal.")
+    elif labeled:
+        rep.add("FLW007", "INFO", "flow",
+                f"no se marcó el flujo principal: no se pudo validar cuáles de las {len(labeled)} flechas con etiqueta deberían llevarla",
+                found=len(labeled),
+                hint="Marca los pasos del flujo principal con [emphasis: true]; solo esos llevan etiqueta.")
+    for e in labeled:
+        words = label_words(e["label"])
+        if len(words) > MAX_LABEL_WORDS:
+            rep.add("FLW002", "WARNING", "flow", f"la etiqueta {e['label']!r} tiene {len(words)} palabras (máximo {MAX_LABEL_WORDS})",
+                    subject=e["id"], expected=MAX_LABEL_WORDS, found=len(words),
+                    hint="Acórtala a un verbo o un protocolo; el detalle va en la explicación.")
+    degree = {}
+    for e in edges:
+        for end in (e["source"], e["target"]):
+            degree[end] = degree.get(end, 0) + 1
+    for nid, deg in sorted(degree.items()):
+        if deg > MAX_HUB_DEGREE:
+            rep.add("FLW003", "WARNING", "flow", f"{nid!r} tiene {deg} conexiones (máximo {MAX_HUB_DEGREE})",
+                    subject=nid, expected=MAX_HUB_DEGREE, found=deg,
+                    hint="Acerca o agrupa sus vecinos, o divide el diagrama; no sumes más flechas al hub.")
+    both = [e for e in edges if e.get("arrow") == "both"]
+    if len(both) > MAX_BIDIRECTIONAL:
+        rep.add("FLW004", "WARNING", "flow", f"{len(both)} flechas de ida y vuelta (máximo {MAX_BIDIRECTIONAL})",
+                expected=MAX_BIDIRECTIONAL, found=len(both), subject=", ".join(e["id"] for e in both),
+                hint="Usa una sola dirección: la respuesta de una llamada síncrona está implícita.")
+    anchored = {end for e in irlib.flow_edges(ir) if "invis" not in str((e.get("extensions") or {}).get("style", ""))
+                for end in (e["source"], e["target"])}
+    callouts = [n["id"] for n in nodes if is_note(n) and n["id"] in anchored]
+    if len(callouts) > MAX_CALLOUTS:
+        rep.add("FLW005", "WARNING", "flow", f"{len(callouts)} notas junto a componentes (máximo {MAX_CALLOUTS})",
+                expected=MAX_CALLOUTS, found=len(callouts), subject=", ".join(callouts),
+                hint="Deja las notas que aportan; el resto va en la explicación.")
+    dashed = {n["id"] for n in components if "dashed" in str((n.get("extensions") or {}).get("style", ""))}
+    by_target = {}
+    for e in edges:
+        if e["source"] in dashed:
+            by_target.setdefault(e["target"], []).append(e["source"])
+    for target, sources in sorted(by_target.items()):
+        if len(sources) > 1:
+            rep.add("FLW006", "WARNING", "flow",
+                    f"{len(sources)} elementos a validar llegan por separado a {target!r}: {', '.join(sorted(sources))}",
+                    subject=target, found=len(sources),
+                    hint="Agrúpalos en un cluster punteado con una sola flecha hacia el destino.")
+
+
 def check_text(ir, style, rep):
     wrap = int(style["LABEL_WRAP"])
     fsize = float(style["FONT_SIZE_NODE"])
@@ -263,6 +353,7 @@ def validate(ir, ir_path="", max_nodes=MAX_NODES, max_edges=MAX_EDGES):
     check_connectivity(ir, rep)
     check_clusters(ir, rep)
     check_size(ir, rep, max_nodes, max_edges)
+    check_flow(ir, rep)
     check_text(ir, style, rep)
     check_style(style, rep)
     check_resolution(ir, rep)

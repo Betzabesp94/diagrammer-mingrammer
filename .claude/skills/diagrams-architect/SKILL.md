@@ -56,9 +56,10 @@ y avisa "Miro: no disponible". El procedimiento completo está en `references/mi
 - **El SVG sale del IR y del SVG de Graphviz** (posiciones y ruta del PNG de cada nodo), no de memoria.
 - **Íconos como imagen desde jsDelivr con versión fija**: `https://cdn.jsdelivr.net/gh/mingrammer/diagrams@<env.diagrams>/resources/<proveedor>/<categoría>/<archivo>.png`.
   Verifica la URL (`200`, `image/png`); si falla, el nodo se dibuja como rect con label y se reporta.
-- **Grupos:** el diagrama es un frame; cada cluster es un rect de color dentro, en columnas por capa con la banda
-  transversal abajo (un frame no admite borde, así que lo punteado siempre es rect). Conectores antes que nodos
-  (el orden de creación es el z-order) y `&`, `<`, `>` escapados.
+- **Layout en grilla (formato v3):** el flujo principal en una fila, lo demás colgado arriba o abajo de su
+  componente, el actor junto a su entrada, sin carriles por capa y la explicación en un frame aparte. Solo el flujo
+  principal lleva número y etiqueta; lo secundario va en gris fino sin texto. Los grupos son rects (un frame no admite
+  borde). Conectores antes que nodos (el orden de creación es el z-order) y `&`, `<`, `>` escapados.
 - **Verifica y reporta:** revisa `failed_items`, reposiciona lo que Miro redimensione, compara conteos con el IR y pide
   al usuario que mire el render; la lectura prueba la estructura, no la apariencia.
 - **El `.diag` manda.** Los cambios se hacen en el `.diag` y se re-publican con los `data-miro-id` guardados en
@@ -89,7 +90,9 @@ Gramática completa, atributos y errores: `references/dsl.md`.
 ## Reglas al escribir el `.diag`
 
 - **Una arista por línea** y **etiquetas específicas**: un verbo o un protocolo (`"HTTPS"`, `"lee"`, `"publica evento"`),
-  nunca `"usa"` ni `"conecta"`.
+  nunca `"usa"` ni `"conecta"`, de hasta 3 palabras.
+- **Marca el flujo principal** con `[emphasis: true]`: solo esos pasos llevan etiqueta; las relaciones secundarias van
+  sin texto y se explican aparte.
 - **Iconos reales**: usa `icon: <proveedor>-<servicio>`. Nunca escribas ni inventes un import. Para buscar
   una clase: `.venv/bin/python .claude/skills/diagrams-architect/scripts/introspect_diagrams.py resolve <nombre> --provider aws`
   (o `search <texto>`). Si no existe, el icono cae a uno genérico y se reporta (`RES003`).
@@ -108,7 +111,8 @@ Gramática completa, atributos y errores: `references/dsl.md`.
 - **ERROR** (bloquea): corrige el `.diag`. Ejemplos: `PAR001` sintaxis, `CONN001` arista a un nodo inexistente,
   `CLU004` labels de grupo repetidos, `CLU006` más de 5 grupos hermanos, `FID*` el código no es el IR.
 - **WARNING**: se reporta siempre, con su id. Ejemplos: `CONN003` nodo huérfano, `TXT001` label largo,
-  `LAY001`–`LAY008` problemas de layout, `ARQ*` avisos de arquitectura.
+  `LAY001`–`LAY008` problemas de layout, `FLW*` flujo y legibilidad (demasiadas etiquetas, hubs, flechas de ida y
+  vuelta, notas), `ARQ*` avisos de arquitectura.
 - **INFO**: informa (icono inferido, leyenda, versiones).
 
 **Nunca cambies la topología pedida para callar un warning**: se reporta y el usuario decide. Un warning de

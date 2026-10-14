@@ -13,8 +13,8 @@ Sistema {
 }
 
 Cliente > API: "HTTPS" [emphasis: true]
-API > Usuarios: "valida token" [type: authentication]
-API > Pedidos: "invoca"
-Pedidos > Cola: "publica evento" [type: event]
-Pedidos > Tabla: "escribe"
-Cola > Pedidos: "reintenta" [type: dependency]
+API > Usuarios [type: authentication]
+API > Pedidos: "invoca" [emphasis: true]
+Pedidos > Cola: "publica evento" [type: event, emphasis: true]
+Pedidos > Tabla: "escribe" [emphasis: true]
+Cola > Pedidos [type: dependency]

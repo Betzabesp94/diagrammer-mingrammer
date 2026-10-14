@@ -52,6 +52,22 @@ Cada script devuelve el mismo contrato JSON: `overall` (`PASS` | `WARN` | `FAIL`
 | TXT001 | WARNING | el label estimado no cabe en el nodo | bajar `LABEL_WRAP` o subir `NODE_WIDTH` |
 | TXT002 | WARNING | tamaño de fuente ilegible al DPI de salida | subir `FONT_SIZE_*` |
 | TXT003 | WARNING | etiqueta de arista vaga (`usa`, `conecta`) | usar un verbo o un protocolo |
+| SIZ003 | INFO | más de 14 componentes en el flujo (sin notas ni íconos sin flechas, como la banda transversal; sí cuentan los `standalone`): cuesta leerlos en una vista de Miro o ejecutiva | agrupar o dividir el diagrama |
+
+## Flujo y legibilidad
+
+Cuentan solo las flechas que se dibujan entre componentes: no las invisibles (`gv.style: invis`) ni las anclas de las
+notas. Nunca bloquean; ajusta el `.diag` si el pedido lo permite, o repórtalas.
+
+| Id | Sev. | Significa | Remedio |
+|---|---|---|---|
+| FLW001 | WARNING | una flecha fuera del flujo principal lleva etiqueta. El máximo de etiquetas es la cantidad de pasos del flujo principal (flechas con `emphasis: true`) | quitar la etiqueta de lo secundario y explicarlo aparte, o marcar la flecha como `emphasis` si es del flujo principal |
+| FLW002 | WARNING | etiqueta de flecha de más de 3 palabras (no cuentan marcadores como `①` ni conectores como `y`, `de`, `a`, `por`) | acortarla; el detalle va en la explicación |
+| FLW003 | WARNING | un nodo con más de 7 conexiones (hub tipo telaraña) | acercar o agrupar sus vecinos, o dividir el diagrama |
+| FLW004 | WARNING | más de 2 flechas de ida y vuelta (`<>`) | una sola dirección: la respuesta síncrona está implícita |
+| FLW005 | WARNING | más de 2 notas ancladas a componentes | dejar las que aportan; el resto va en la explicación |
+| FLW006 | WARNING | 2 o más elementos "a validar" (punteados) llegan por separado al mismo destino | agruparlos en un cluster punteado con una sola flecha |
+| FLW007 | INFO | hay flechas con etiqueta pero ninguna marcada como flujo principal: `FLW001` no se pudo evaluar | marcar los pasos del flujo principal con `[emphasis: true]` |
 
 ## Estilo y código
 
