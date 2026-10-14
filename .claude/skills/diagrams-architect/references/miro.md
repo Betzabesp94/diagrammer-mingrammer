@@ -19,11 +19,45 @@ derivada, como el `.py` y el PNG. Probado el 13/10/2026 con `calificacion_leads`
 Los diagramas son de clientes. Publicar en Miro envía a un servicio externo los textos del diagrama (labels, notas,
 nombres de grupos) y deja los datos en la cuenta de Miro del usuario.
 
-1. **Confirma el board destino** antes del primer envío de una conversación:
-   - Si el usuario dio una URL de board, úsala.
-   - Si no, pregunta si quiere un board nuevo. Para crearlo existe `board_create` (carga su esquema con `ToolSearch`),
-     pero crear un board es una acción en la cuenta del usuario: confirma antes equipo o espacio y nombre.
-2. **Nunca compartas** el board (`board_share`, `space_share`) ni cambies roles sin que el usuario lo pida.
+### Organización: un board por proyecto, un frame por diagrama
+
+Cada proyecto o cliente tiene **su propio board**; dentro, cada diagrama es **un frame** con el `title` del `.diag`
+como nombre. Así un diagrama se encuentra por board y luego por nombre de frame, y los datos de un cliente no se
+mezclan con los de otro. La skill **nunca crea un board por su cuenta** ni reutiliza uno sin saber de qué proyecto es.
+
+El vínculo entre proyecto y board vive en `diagrams_src/miro_boards.json` (ignorado por git):
+
+```json
+{
+  "El País - AI Deep Dive": {
+    "board_url": "https://miro.com/app/board/<id>=/",
+    "kind": "project",
+    "created": "2026-10-13",
+    "notes": ""
+  }
+}
+```
+
+`kind` es `project` (board de un proyecto real) o `test` (board de pruebas: nunca recibe diagramas de un proyecto
+sin preguntar). La clave es el nombre del proyecto tal cual aparece en `project:` del `.diag`.
+
+### Cómo se elige el board (antes del primer envío de cada diagrama)
+
+1. **Identifica el proyecto.** Usa la directiva `project:` del `.diag`. Si no la tiene, pregunta al usuario de qué
+   proyecto es, agrega `project: <nombre>` al `.diag` y vuelve a correr el pipeline.
+2. **Busca el proyecto en `miro_boards.json`.**
+   - Si tiene board de `kind: project`, úsalo y di en qué board se publica.
+   - Si no tiene, o solo hay un board `test`, **pregunta**: ¿crear un board nuevo para el proyecto o usar una URL
+     existente? Para crear existe `board_create` (carga su esquema con `ToolSearch`); confirma antes nombre del board
+     (por omisión, el nombre del proyecto) y equipo o espacio.
+3. **Registra** el board elegido o creado en `miro_boards.json` antes de publicar.
+4. **Una URL que el usuario pegue en la conversación** no cambia el registro por sí sola: pregunta si es el board del
+   proyecto (y entonces regístrala) o solo un destino puntual (por ejemplo, una prueba).
+5. **Nunca mezcles proyectos** en un board: si el board registrado pertenece a otro proyecto, detente y pregunta.
+
+### Otras reglas
+
+1. **Nunca compartas** el board (`board_share`, `space_share`) ni cambies roles sin que el usuario lo pida.
 3. **Los íconos son lo único público**: salen de jsDelivr (paquete de la librería `diagrams`). Nada del diagrama
    se sube a servicios públicos. Miro copia esas imágenes a su almacenamiento al crear.
 4. Si el `.diag` marca datos personales o sensibles (por ejemplo un nodo "Datos personales"), menciónalo al pedir
@@ -70,8 +104,8 @@ https://cdn.jsdelivr.net/gh/mingrammer/diagrams@<VERSIÓN>/resources/<proveedor>
 |---|---|
 | Nodo con ícono | `<image id="<id del IR>" data-type="image" href="<URL jsDelivr>" x y width height>` de unos 100x100, más un `<textArea>` centrado debajo con el `label` (ancho fijo de 190 a 230, `text-align="center"`, `font-size="14"`) |
 | Nodo sin ícono (nota, texto) | `<rect>` redondeado con `data-content` y el color del IR (`gv.fillcolor`) |
-| Cluster de primer nivel | Un frame `<g data-frame="<label>">` con `fill` = `bgcolor` del cluster |
-| Cluster anidado o con borde especial | `<rect rx="12">` con `fill`, `stroke` = `pencolor` y `data-content` arriba a la izquierda |
+| Diagrama completo | Un frame `<g data-frame="<title del .diag>">` blanco que contiene todo el diagrama |
+| Cluster (cualquier nivel) | `<rect rx="12">` con `fill` = `bgcolor`, `stroke` = `pencolor` y `data-content` arriba a la izquierda |
 | Cluster con `style: dashed` | `stroke-dasharray="5,5"` en el rect. **Un frame no admite borde**, así que un grupo punteado es siempre un rect |
 | Arista | `<line data-start data-end data-arrow="end">` entre los ids locales de las imágenes |
 | Arista `<>` | `data-arrow="both"` |
@@ -81,13 +115,16 @@ https://cdn.jsdelivr.net/gh/mingrammer/diagrams@<VERSIÓN>/resources/<proveedor>
 ### Reglas del SVG
 
 - **Orden de creación = z-order.** Primero los rects de cluster, luego los conectores, al final imágenes y textos.
-- **Los frames no se anidan.** Un frame por cluster de primer nivel; lo que esté dentro es rect. Los conectores que
-  cruzan frames funcionan, pero la spec recomienda evitarlo salvo que el diagrama lo pida: aquí suele hacer falta, está bien.
+- **Un frame por diagrama** y los clusters como rects dentro de él (los frames no se anidan). Así el diagrama se
+  busca por su nombre y se mueve entero, y los conectores no cruzan frames.
+- **Layout por columnas de capa:** una columna por cluster en el orden del `.diag` (los hijos de un contenedor como
+  `Nube AWS` van dentro de un rect que los envuelve), los nodos sin cluster en una última columna, y la banda
+  transversal abajo a todo el ancho. Dentro de cada columna, los nodos siguen el orden vertical que les dio Graphviz.
 - Dentro de un frame las coordenadas son **relativas** a su `translate`; fuera, absolutas.
 - Fija `data-start-side` y `data-end-side` según `direction` (`LR`: derecha a izquierda; `TB`: abajo a arriba) y usa
   `data-shape="straight"` o `"elbowed"`, nunca `curved`.
-- Posiciones: toma las de Graphviz (el eje `y` del SVG de Graphviz es negativo y viene dentro de un `transform`;
-  normaliza restando el mínimo) y escálalas para que dos nodos no queden a menos de 60 px. Un ícono es de 100 px.
+- Separa los frames de un mismo board unos 400 px y colócalos uno debajo del otro; si Miro desplaza el lote
+  (auto-colocación), sigue con las coordenadas del `result_svg`.
 - **Escapa** `&`, `<` y `>` en todo atributo y texto (`&amp;`, `&lt;`, `&gt;`). Un `&` sin escapar hace fallar todo el SVG.
   Sin saltos de línea dentro de `data-content`.
 - Usa **los colores del `.diag`** (`gv.bgcolor`, `gv.pencolor`, `gv.fillcolor`). La guía de estilo "Bright Paper"
@@ -108,8 +145,9 @@ https://cdn.jsdelivr.net/gh/mingrammer/diagrams@<VERSIÓN>/resources/<proveedor>
 4. **Verifica con `canvas_read_as_svg`** sobre el área devuelta: mismo número de nodos (`<image>`), de aristas
    (`<line data-start>`) y de grupos que el IR. Que la lectura coincida prueba la estructura, **no** que se vea bien:
    el render no se puede ver desde aquí. Pide al usuario que abra el board y confirme, sobre todo con textos largos.
-5. **Guarda el vínculo** en `diagrams_src/<slug>.miro.json` (la carpeta está ignorada por git):
-   URL del board, `data-miro-id` del frame, y el mapa `id del IR` a `data-miro-id`. Sirve para actualizar sin duplicar.
+5. **Guarda el vínculo** en `diagrams_src/<slug>.miro.json` (la carpeta está ignorada por git): proyecto, URL del
+   board, `data-miro-id` del frame y su enlace `?moveToWidget=`. Los ids de cada elemento se recuperan leyendo el
+   frame (`canvas_read_as_svg` con `widget_ids=[<frame>]`). Sirve para actualizar sin duplicar.
 
 ## 6. Actualizar un diagrama ya publicado
 
@@ -140,7 +178,7 @@ Prueba con 3 nodos, 2 conectores, un frame con color y un rect punteado en un bo
 Agrega al reporte final (ver `report_format.md`) una línea de Miro:
 
 ```
-Miro:      <URL del board>?moveToWidget=<id del frame>   | o: no disponible / no publicado (motivo)
+Miro:      <proyecto> · "<nombre del frame>" · <URL del board>?moveToWidget=<id del frame>   | o: no disponible / no publicado (motivo)
            N nodos · N aristas · N grupos · N íconos sin URL (lista)
 ```
 

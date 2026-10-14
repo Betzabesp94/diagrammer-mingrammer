@@ -10,7 +10,8 @@ Las aplica el generador; este archivo explica qué esperar y cómo trabajar con 
 | `diagrams_src/` | tus diagramas: `<slug>.diag` (lo que editas), `<slug>.ir.json` y `<slug>.py` (generados) | ignorada |
 | `output/` | `<slug>.png`/`.svg`/`.dot` y `<slug>.report.json` | ignorada |
 
-Si publicas en Miro, `diagrams_src/<slug>.miro.json` guarda la URL del board y los ids de Miro (ver `miro.md`); también queda ignorado.
+Si publicas en Miro, `diagrams_src/miro_boards.json` asocia cada proyecto con su board y `diagrams_src/<slug>.miro.json`
+guarda el frame de cada diagrama (ver `miro.md`); ambos quedan ignorados.
 
 Nunca agregues a git nada de `diagrams_src/`. No edites los `.py` ni los `.ir.json`: cambia el `.diag`.
 

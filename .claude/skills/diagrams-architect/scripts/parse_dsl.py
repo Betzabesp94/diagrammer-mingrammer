@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import irlib  # noqa: E402
 
-DIRECTIVES = ("title", "direction", "provider", "slug", "splines", "legend", "entrypoint", "production")
+DIRECTIVES = ("title", "direction", "provider", "slug", "splines", "legend", "entrypoint", "production", "project")
 NODE_ATTRS = {"icon", "label", "service", "standalone"}
 GROUP_ATTRS = {"label", "boundary"}
 EDGE_ATTRS = {"type", "emphasis"}
@@ -227,7 +227,7 @@ class Parser:
             self.open_lines.pop()
             return
 
-        m = re.match(r"^(title|direction|provider|slug|splines|legend|entrypoint|production|style\.[A-Z_]+)\s*:\s*(.*)$", text)
+        m = re.match(r"^(title|direction|provider|slug|splines|legend|entrypoint|production|project|style\.[A-Z_]+)\s*:\s*(.*)$", text)
         if m and not self.stack:
             self.directive(m.group(1), m.group(2), lineno, col)
             return
@@ -264,6 +264,8 @@ class Parser:
             raise ParseError(lineno, col, "legend debe ser 'on' u 'off'")
         if key == "production" and value not in ("true", "false"):
             raise ParseError(lineno, col, "production debe ser 'true' o 'false'")
+        if key == "project" and not value:
+            raise ParseError(lineno, col, "project no puede estar vacío")
         self.directives[key] = value
         self.directive_lines[key] = (lineno, col)
 
@@ -381,6 +383,8 @@ class Parser:
             "legend": {"auto": self.directives.get("legend", "on") == "on"},
             "meta": {"parser_version": 1},
         }
+        if "project" in self.directives:
+            ir["meta"]["project"] = self.directives["project"]
         if "splines" in self.directives:
             ir["style_overrides"]["SPLINES"] = self.directives["splines"]
         constraints = {}

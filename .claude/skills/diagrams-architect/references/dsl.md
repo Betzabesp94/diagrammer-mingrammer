@@ -16,6 +16,7 @@ Cualquier error se reporta como `PAR001` con `línea:columna`; nada se descarta 
 | `legend:` | `on` `off` | leyenda automática (por defecto `on`) |
 | `entrypoint: Nodo` | nombre de un nodo | nodo expuesto a internet; activa las reglas ARQ001 y ARQ002 |
 | `production: true` | `true` `false` | activa las reglas ARQ003 y ARQ004 |
+| `project: Nombre` | texto | proyecto o cliente del diagrama; va a `meta.project` del IR y decide el board de Miro (ver `miro.md`) |
 | `style.VARIABLE: valor` | ver `style_system.md` | sobrescribe una variable del bloque STYLE (ej. `style.FONT_SIZE_NODE: 13`) |
 
 ## Nodos

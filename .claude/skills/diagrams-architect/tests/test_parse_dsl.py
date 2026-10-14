@@ -63,6 +63,13 @@ class ParseDSL(unittest.TestCase):
         self.assertEqual((ir["title"], ir["direction"], ir["legend"]), ("Hola", "TB", {"auto": False}))
         self.assertEqual(ir["style_overrides"], {"LABEL_WRAP": 20, "SPLINES": "ortho"})
 
+    def test_project_goes_to_meta(self):
+        ir = parse('project: "El País - AI Deep Dive"\nA\n')
+        self.assertEqual(ir["meta"]["project"], "El País - AI Deep Dive")
+        self.assertNotIn("project", parse("A\n")["meta"])
+        with self.assertRaises(parse_dsl.ParseError):
+            parse("project: \nA\n")
+
     def test_ids_are_unique_across_nodes_and_clusters(self):
         ir = parse("G {\n  N\n}\nG2 {\n  N2\n}\n")
         ids = [n["id"] for n in ir["nodes"]] + [c["id"] for c in ir["clusters"]]
