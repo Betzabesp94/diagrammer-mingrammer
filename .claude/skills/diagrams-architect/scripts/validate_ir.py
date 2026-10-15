@@ -233,9 +233,18 @@ def check_flow(ir, rep):
             rep.add("FLW002", "WARNING", "flow", f"la etiqueta {e['label']!r} tiene {len(words)} palabras (máximo {MAX_LABEL_WORDS})",
                     subject=e["id"], expected=MAX_LABEL_WORDS, found=len(words),
                     hint="Acórtala a un verbo o un protocolo; el detalle va en la explicación.")
+    clusters = {c["id"]: c for c in ir.get("clusters", [])}
+    node_cluster = {n["id"]: n.get("cluster") for n in nodes}
+
+    def dashed_cluster(nid):
+        cl = node_cluster.get(nid)
+        return cl if cl and "dashed" in str((clusters.get(cl, {}).get("extensions") or {}).get("style", "")) else None
+
+    # Las flechas que salen de un mismo cluster punteado hacia el mismo destino se dibujan como una sola.
+    pairs = {(dashed_cluster(e["source"]) or e["source"], dashed_cluster(e["target"]) or e["target"]) for e in edges}
     degree = {}
-    for e in edges:
-        for end in (e["source"], e["target"]):
+    for a_, b_ in pairs:
+        for end in (a_, b_):
             degree[end] = degree.get(end, 0) + 1
     for nid, deg in sorted(degree.items()):
         if deg > MAX_HUB_DEGREE:
@@ -259,8 +268,15 @@ def check_flow(ir, rep):
     for e in edges:
         if e["source"] in dashed:
             by_target.setdefault(e["target"], []).append(e["source"])
+    def grouped(sources):
+        """Ya agrupados: todos dentro del mismo cluster punteado (en Miro sale una sola flecha desde el cluster)."""
+        cl = {node_cluster.get(s) for s in sources}
+        if len(cl) != 1 or None in cl:
+            return False
+        return "dashed" in str((clusters.get(cl.pop(), {}).get("extensions") or {}).get("style", ""))
+
     for target, sources in sorted(by_target.items()):
-        if len(sources) > 1:
+        if len(sources) > 1 and not grouped(sources):
             rep.add("FLW006", "WARNING", "flow",
                     f"{len(sources)} elementos a validar llegan por separado a {target!r}: {', '.join(sorted(sources))}",
                     subject=target, found=len(sources),

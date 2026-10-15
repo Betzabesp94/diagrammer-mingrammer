@@ -63,10 +63,10 @@ notas. Nunca bloquean; ajusta el `.diag` si el pedido lo permite, o repórtalas.
 |---|---|---|---|
 | FLW001 | WARNING | una flecha fuera del flujo principal lleva etiqueta. El máximo de etiquetas es la cantidad de pasos del flujo principal (flechas con `emphasis: true`) | quitar la etiqueta de lo secundario y explicarlo aparte, o marcar la flecha como `emphasis` si es del flujo principal |
 | FLW002 | WARNING | etiqueta de flecha de más de 3 palabras (no cuentan marcadores como `①` ni conectores como `y`, `de`, `a`, `por`) | acortarla; el detalle va en la explicación |
-| FLW003 | WARNING | un nodo con más de 7 conexiones (hub tipo telaraña) | acercar o agrupar sus vecinos, o dividir el diagrama |
+| FLW003 | WARNING | un nodo con más de 7 conexiones (hub tipo telaraña); las flechas desde un mismo cluster punteado cuentan como una | acercar o agrupar sus vecinos, o dividir el diagrama |
 | FLW004 | WARNING | más de 2 flechas de ida y vuelta (`<>`) | una sola dirección: la respuesta síncrona está implícita |
 | FLW005 | WARNING | más de 2 notas ancladas a componentes | dejar las que aportan; el resto va en la explicación |
-| FLW006 | WARNING | 2 o más elementos "a validar" (punteados) llegan por separado al mismo destino | agruparlos en un cluster punteado con una sola flecha |
+| FLW006 | WARNING | 2 o más elementos "a validar" (punteados) llegan por separado al mismo destino y no están en un mismo cluster punteado | agruparlos en un cluster punteado; en Miro sale una sola flecha desde el cluster |
 | FLW007 | INFO | hay flechas con etiqueta pero ninguna marcada como flujo principal: `FLW001` no se pudo evaluar | marcar los pasos del flujo principal con `[emphasis: true]` |
 
 ## Estilo y código

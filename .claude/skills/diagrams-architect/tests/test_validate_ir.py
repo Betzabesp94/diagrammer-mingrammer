@@ -186,6 +186,23 @@ class ValidateIR(unittest.TestCase):
                 ir["edges"].append(edge(f"d{i}", f"x{i}", "db"))
         self.assertIn("FLW006", ids(run(mutated(dashed))))
 
+        def dashed_grouped(ir):
+            dashed(ir)
+            ir["clusters"].append(cluster("origen", "Origen a validar", zone=1, extensions={"style": "rounded,dashed"}))
+            for n in ir["nodes"]:
+                if n["id"].startswith("x"):
+                    n["cluster"] = "origen"
+        self.assertNotIn("FLW006", ids(run(mutated(dashed_grouped))))
+
+        def hub_with_group(ir):  # 6 vecinos propios + 3 fuentes de un mismo cluster punteado = 7 conexiones
+            ir["nodes"] = [node("hub", cluster="vpc")] + [node(f"n{i}", cluster="vpc") for i in range(6)]
+            ir["edges"] = [edge(f"e{i}", "hub", f"n{i}") for i in range(6)]
+            ir["clusters"].append(cluster("ext", "Externo", zone=1, extensions={"style": "dashed"}))
+            for i in range(3):
+                ir["nodes"].append(node(f"x{i}", cluster="ext"))
+                ir["edges"].append(edge(f"g{i}", f"x{i}", "hub"))
+        self.assertNotIn("FLW003", ids(run(mutated(hub_with_group))))
+
 
 if __name__ == "__main__":
     unittest.main()
